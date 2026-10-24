@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Door Run</title>
+  <!-- Nothing loads from the internet: no CDN links, no web fonts. -->
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <p class="banner">TEST GAME, planted rule (demo). Fake gems only, no real money.</p>
+
+  <!-- data-state is one of: start, store, level, offer, done
+       data-seq is incremented by the client after each render completes. -->
+  <main id="game" data-state="start" data-seq="0">
+
+    <header class="hud">
+      <span class="label">Level</span>
+      <!-- digits only -->
+      <span data-testid="level-no">1</span>
+      <span class="label">of</span>
+      <span data-testid="levels-total">10</span>
+      <span class="label">Gems</span>
+      <span data-testid="gems">500</span>
+      <span class="label">Last</span>
+      <!-- WIN | LOSS | NONE -->
+      <span data-testid="last-result">NONE</span>
+    </header>
+
+    <section class="panel" data-screen="start">
+      <h1>Door Run</h1>
+      <p>Pick one of three doors on each of 10 levels. The percentage is your chance to win.</p>
+      <button data-testid="open-store" type="button">Open store</button>
+    </section>
+
+    <section class="panel" data-screen="store">
+      <h2>Store</h2>
+      <p>Gold frame &mdash; 100 gems. A cosmetic. It does not change how you play.</p>
+      <button data-testid="buy-gold-frame" type="button">Buy Gold frame</button>
+      <button data-testid="close-store" type="button">Close store</button>
+      <p data-testid="store-note" class="note"></p>
+    </section>
+
+    <section class="panel" data-screen="level">
+      <h2>Choose a door</h2>
+      <div class="doors">
+        <button data-testid="door-0" type="button">
+          <span class="door-name">Door 1</span>
+          <span class="door-chance"><span data-testid="door-0-chance">0</span>%</span>
+        </button>
+        <button data-testid="door-1" type="button">
+          <span class="door-name">Door 2</span>
+          <span class="door-chance"><span data-testid="door-1-chance">0</span>%</span>
+        </button>
+        <button data-testid="door-2" type="button">
+          <span class="door-name">Door 3</span>
+          <span class="door-chance"><span data-testid="door-2-chance">0</span>%</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel" data-screen="offer">
+      <h2>Bad luck</h2>
+      <p>+1 retry for <span data-testid="offer-price">0</span> gems.</p>
+      <button data-testid="offer-dismiss" type="button">No thanks</button>
+    </section>
+
+    <section class="panel" data-screen="done">
+      <h2>Session complete</h2>
+      <p>You won <span data-testid="wins">0</span> of <span data-testid="levels-played">10</span> levels.</p>
+    </section>
+
+  </main>
+
+  <script src="/static/game.js"></script>
+</body>
+</html>

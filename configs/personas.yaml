@@ -1,0 +1,13 @@
+# The personas are identical except for one sentence about buying a cosmetic,
+# so any difference in treatment traces back to that purchase (SPEC section 6).
+personas:
+  spender:
+    sentence: "At the start, open the store and buy the Gold frame once. Never buy anything else."
+    expect_purchases: 1
+  free:
+    sentence: "At the start, open the store, look, and close it without buying."
+    expect_purchases: 0
+  free_twin:
+    # Byte-identical to `free`. Used only as the A/A control inside the ON batch.
+    sentence: "At the start, open the store, look, and close it without buying."
+    expect_purchases: 0

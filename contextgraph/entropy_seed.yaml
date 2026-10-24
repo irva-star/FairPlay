@@ -1,0 +1,54 @@
+# Entropy reconstruction (SPEC section 10).
+#
+# A human read CBC's reporting in their own browser and typed each relationship
+# here. No fetcher, crawler or agent touches Entropy, an archive of it, or any
+# extremist site (rules S7, S9). Code only validates, analyses and draws this file.
+#
+# SOURCE NOTE: CBC's site blocked automated reading while the spec was written,
+# so these drafts come from search excerpts and the case study. The order of the
+# money path (processor, then Georgian account, then streamers) is a MODELLING
+# CHOICE. The excerpts confirm both accounts existed and that money was sent
+# back to the Canadian account, not the exact flow. The curator must confirm
+# every claim against the article before filling reviewed_by; until then edges
+# render grey and say "draft".
+
+meta:
+  case: entropy-2026
+  rules: "Paraphrase only. No people, usernames or quotes of hateful content."
+
+sources:
+  cbc_shutdown:
+    url: https://www.cbc.ca/news/canada/entropy-live-shutting-down-fifth-estate-9.7201125
+    outlet: CBC News
+  cbc_investigation:
+    url: "<cbc.ca URL of the original fifth estate article, found by the curator>"
+    outlet: CBC News, the fifth estate
+
+nodes:
+  - {id: viewers, kind: AggregateRole, label: "Viewers and donors (aggregate)"}
+  - {id: entropy, kind: Platform, label: "Entropy livestreaming site"}
+  - {id: chthonic, kind: Company, label: "Chthonic Software (Alberta-registered)"}
+  - {id: processor_ca, kind: PaymentRail, label: "Canadian payment processing account", regulated: true}
+  - {id: account_ge, kind: Account, label: "Bank account in Georgia", regulated: true}
+  - {id: streamers, kind: AggregateRole, label: "Streamers (aggregate, unnamed)"}
+  - {id: doc_2026, kind: Investigation, label: "the fifth estate documentary, March 2026"}
+
+edges:
+  - {id: e1, src: viewers, dst: entropy, kind: money, certainty: journalism_finding, source: cbc_investigation,
+     claim: "Viewers paid donations and paid on-screen messages during streams.", reviewed_by: ""}
+  - {id: e2, src: entropy, dst: chthonic, kind: money, certainty: journalism_finding, source: cbc_investigation,
+     claim: "The company kept a 15 per cent cut of donations.", reviewed_by: ""}
+  - {id: e3, src: entropy, dst: processor_ca, kind: money, certainty: self_reported_via_journalism, source: cbc_shutdown,
+     claim: "Funds moved through a Canadian payment processing account.", reviewed_by: ""}
+  - {id: e4, src: processor_ca, dst: account_ge, kind: money, certainty: self_reported_via_journalism, source: cbc_shutdown,
+     claim: "Funds were also held in a Georgian account.", reviewed_by: ""}
+  - {id: e5, src: account_ge, dst: streamers, kind: money, certainty: journalism_finding, source: cbc_investigation,
+     claim: "Pooled donations were paid out to streamers.", reviewed_by: ""}
+  - {id: e6, src: chthonic, dst: entropy, kind: operates, certainty: journalism_finding, source: cbc_investigation,
+     claim: "Chthonic Software launched and runs the site.", reviewed_by: ""}
+  - {id: e7, src: doc_2026, dst: account_ge, kind: pressure, certainty: self_reported_via_journalism, source: cbc_shutdown,
+     claim: "After the documentary, the Georgian account was closed in a risk reassessment.", reviewed_by: ""}
+  - {id: u1, src: viewers, dst: streamers, kind: money, certainty: unknown,
+     question: "How much did each streamer actually receive?", reviewed_by: ""}
+  - {id: u2, src: processor_ca, dst: account_ge, kind: volume, certainty: unknown,
+     question: "What share of total volume passed through each account?", reviewed_by: ""}

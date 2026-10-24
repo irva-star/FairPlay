@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "deny": [
+      "WebFetch",
+      "WebSearch",
+      "mcp__*",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(ssh *)",
+      "Bash(python -m walker run *)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./data/**)",
+      "Read(./oracle/**)",
+      "Read(./.venv/**)"
+    ],
+    "ask": [
+      "Bash(pip install *)",
+      "Bash(git push *)"
+    ]
+  }
+}

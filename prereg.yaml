@@ -1,0 +1,99 @@
+# Pre-registration (SPEC section 8).
+#
+# Commit this file to git BEFORE the ON and OFF batches. Its hash is stored with
+# every result row and displayed on the dashboard, which is what makes the
+# analysis plan checkable after the fact rather than chosen to fit the data.
+#
+# If the pilot power check says a primary metric needs more than 60 sessions,
+# change n or that metric's margin HERE and commit the change before the runs.
+
+version: 1
+case: fairplay-build-north-2026
+unit_of_analysis: session
+alpha: 0.05
+sessions_per_persona: 60
+
+model:
+  id: claude-haiku-5-5
+  request_settings:
+    max_tokens: 256
+    tool_choice: {type: any, disable_parallel_tool_use: true}
+    temperature: unset      # Haiku 5.5 does not accept it
+    top_p: unset
+    top_k: unset
+    assistant_prefill: never
+    system_cache_control: ephemeral
+
+# Filled in by `python -m walker plan`, which hashes walker/prompts.py.
+prompt_hashes:
+  system_prompt_sha256: "<filled by walker plan, committed before the main runs>"
+  tools_sha256: "<filled by walker plan, committed before the main runs>"
+
+stats_code_version: "1.0.0"
+
+metrics:
+  M1:
+    description: "Offers shown divided by losses"
+    role: primary
+    margin: 0.15
+    expected_effect_switch_on: 0.50
+    excluded_when: "session has zero losses"
+  M2:
+    description: "Mean best displayed door chance on levels that follow a loss"
+    role: primary
+    margin: 3.0          # percentage points
+    expected_effect_switch_on: -10.5
+    excluded_when: "session has zero losses"
+  M3:
+    description: "Win rate over 10 levels"
+    role: secondary
+    margin: 0.10
+    expected_effect_switch_on: "negative, size unknown"
+    excluded_when: null
+  M4:
+    description: "Mean offer price shown"
+    role: negative_control
+    margin: 12.0         # gems
+    expected_effect_switch_on: 0.0
+    excluded_when: "session was shown no offer"
+  B1:
+    description: "Share of picks that took the best displayed door"
+    role: balance_check
+    margin: 0.10
+    expected_effect_switch_on: 0.0
+    excluded_when: null
+    note: "Balance check, deliberately outside the Holm family"
+
+# Contrasts are always A minus B, with B = free.
+contrasts:
+  V1_sensitivity: {batch: on,  a: spender,   b: free}
+  V2_specificity: {batch: off, a: spender,   b: free}
+  V3_aa:          {batch: on,  a: free_twin, b: free}
+
+multiplicity:
+  method: holm
+  family: [M1, M2, M3, M4]
+  outside_family: [B1]
+
+equivalence:
+  method: tost
+  variance: unequal     # Welch
+
+exclusions:
+  - "Metric-level only: a session missing a metric is dropped from that metric, never from the run. Counts are reported."
+  - "Protocol deviations stay in the primary analysis; a sensitivity analysis excludes them."
+
+verdict_rule:
+  - {holm_significant: true,  tost_significant: false, verdict: "Difference detected"}
+  - {holm_significant: true,  tost_significant: true,  verdict: "Detected, below the margin of concern"}
+  - {holm_significant: false, tost_significant: true,  verdict: "Equivalent: no meaningful difference"}
+  - {holm_significant: false, tost_significant: false, verdict: "Inconclusive"}
+
+bootstrap:
+  resamples: 10000
+  seed: 2026
+
+calibration:
+  splits: 1000
+  pool: "free and free_twin sessions from both batches"
+  pass_when: "share of splits with any Holm-significant metric is at most 0.07"

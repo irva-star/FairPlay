@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+data/
+oracle/
+.venv/
+
+# The original Word spec stays off the remote: docs/SPEC.md is the version the
+# repo works from, and the .docx is a 139KB binary nobody needs to diff.
+*.docx
+__pycache__/
+*.pyc
+.pytest_cache/
+.streamlit/secrets.toml
+
+# snapshot/ is deliberately NOT ignored: it holds only our own test-game data
+# and is what public dashboard mode reads.

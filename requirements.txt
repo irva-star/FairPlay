@@ -1,0 +1,40 @@
+# FairPlay Labs — pinned dependencies (rule S13: well-known packages only,
+# pinned, never installed on the suggestion of web content).
+#
+# These pins were written offline. Before the first install, a human reviews
+# this diff (S13) and corrects any pin that does not resolve.
+#
+#   python -m venv .venv
+#   .venv\Scripts\activate          (Windows)   |   source .venv/bin/activate  (macOS/Linux)
+#   pip install -r requirements.txt
+#   python -m playwright install chromium
+
+# --- game server -------------------------------------------------------------
+fastapi==0.115.6
+uvicorn==0.34.0
+
+# --- agent walker ------------------------------------------------------------
+playwright==1.49.1
+anthropic==0.42.0
+
+# --- statistics --------------------------------------------------------------
+numpy==2.2.1
+pandas==2.2.3
+scipy==1.15.0
+statsmodels==0.14.4
+
+# --- charts, graph, dashboard ------------------------------------------------
+plotly==5.24.1
+networkx==3.4.2
+streamlit>=1.37
+
+# --- config and validation ---------------------------------------------------
+pyyaml==6.0.2
+jsonschema==4.23.0
+
+# --- tests -------------------------------------------------------------------
+# httpx is required by FastAPI's TestClient. Rule S6 forbids network libraries
+# in app folders; tests/ is the documented exemption.
+httpx==0.28.1
+pytest==8.3.4
+pytest-asyncio==0.25.0

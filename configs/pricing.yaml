@@ -1,0 +1,25 @@
+# Claude Haiku 5.5 published prices, USD per million tokens (SPEC section 3).
+# Verified against the model overview on Oct 23, 2026.
+model: claude-haiku-5-5
+
+prices_usd_per_mtok:
+  input: 0.10
+  output: 0.50
+  cache_write: 0.125
+  cache_read: 0.01
+
+# Caps exist to stop a runaway loop, not because the budget is tight (S5).
+caps_usd:
+  run: 10.00          # all measured batches, shared
+  development: 5.00   # building and smoke tests
+  per_session: 0.02
+
+limits:
+  max_steps_per_session: 30
+  session_timeout_seconds: 120
+  session_retries: 1
+
+# Rate limiter defaults, used until the first response's headers arrive.
+rate_limits:
+  default_requests_per_minute: 40
+  header_safety_fraction: 0.8
