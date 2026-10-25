@@ -1,5 +1,7 @@
 # FairPlay Labs + ContextGraph — Build North Technical Spec
-Oct 23, 2026 · @Sarah
+Oct 23, 2026 · @Sarah · **Revised Oct 25, 2026** after the code audit
+
+> **Revision note (Oct 25).** This revision aligns the spec with the code as built (commit `d3d473e`) and adds container deployment. Every change is marked **[Rev]**. Items marked *must fix* are open bugs from `docs/TECH_DEBT.md`; the code does not yet do what the revised text says.
 ## 1. Scope: what ships by Oct 25
 By Oct 25 we ship one engine with two views, with LLM agents playing a game we built and host ourselves. At current Claude Haiku 5.5 prices, all agent runs should cost under $3 of API credit, hard-capped at $10 in code.
 Primary view: FairPlay planted-difference audit. LLM agent personas play our test game a few hundred times. The engine detects a hidden rule we planted, then shows no false alarm when the rule is switched off.
@@ -109,7 +111,8 @@ The agent's only contact with the game is typed state out and fixed tool calls b
 | Dashboard | Streamlit 1.37 or newer, with browser.gatherUsageStats = false | Fast to build, no telemetry |
 | Tests | pytest |  |
 | Agents | anthropic SDK (async client), claude-haiku-5-5, forced tool use | Cheap, structured actions; also used by the P2 summary |
-| Hosting | A free Python host with HTTPS for the game and the read-only dashboard | Judges get a link |
+| Hosting | **[Rev]** Two Docker images (game, public dashboard) on any container host with HTTPS; `docker compose` locally. See section 15 | Judges get a link; same image runs on any host |
+| Packaging | **[Rev]** `pyproject.toml` with extras `game`, `dashboard`, `walker`, `dev`, locked with `uv` | Each image installs only what it runs; the anthropic SDK and Playwright never reach a server image (S12) |
 
 Local servers bind to 127.0.0.1, so nothing on the laptop is reachable from the venue Wi-Fi. Hosted containers bind to 0.0.0.0 on the port the host provides, because that is how the host routes HTTPS traffic in. The game server always runs with one worker (uvicorn game.server:app --workers 1), because game state lives in memory. The hosted game has no admin routes, and its oracle lines go only to private server logs.
 ## 5. Component 1: the test game, "Door Run"
@@ -120,6 +123,7 @@ Rules (in game/rules.py, shared by the server and stats/calibrate.py so they nev
 - All randomness is seeded: Random(f"{seed}:{level}:doors"), Random(f"{seed}:{level}:outcome") and Random(f"{seed}:{level}:planted"). The seed arrives as ?seed= in the URL, a QA hook.
 - Each new player gets 500 gems. The store sells one item, "Gold frame", a 100-gem cosmetic with no gameplay effect. Buying an item already owned returns HTTP 409 and changes nothing.
 - After a loss the server may show an offer: "+1 retry for N gems", where N is 100, 120 or 150 at random, same odds for everyone. Agents have no accept tool, only dismiss, so play stays comparable.
+- **[Rev, must fix C2]** Dismissing an offer never ends a session early. The server tracks a pending offer separately from the level counter; a session is done only after level 10 is resolved and any offer from level 10 is dismissed. Every completed session therefore has exactly 10 resolved levels, regardless of how many offers were shown. (As built, an offer after level 9 ended the session, in about 15% of sessions and more often for targeted spenders.)
 Segmentation and the planted switch. A player is a spender if they bought anything this session. The switch is set only by the env var PLANTED_SWITCH=on|off at server start; no HTTP endpoint can change it.
 
 | Rule | Spender, switch on | Everyone else, or switch off |
@@ -146,7 +150,13 @@ DOM contract (the only elements walker/observe.py reads; every numeric one conta
 - State: #game[data-state] is one of start, store, level, offer, done. No CSS animations.
 Render counter. #game[data-seq] is an integer the client increments after it finishes rendering each server response. The walker waits for it to rise after every click, because data-state stays level from one level to the next and can't signal that a new level has loaded.
 Oracle log. One JSON line per level in oracle/ground_truth.jsonl: ts, seed, pid, segment, switch, level_no, base_chances, shown_chances, penalty_applied, pick, won, offer_shown, offer_prob, offer_price. The folder is gitignored and off-limits to stats/.
-Hosted copy. Same code on a free Python host, run with one worker. PLANTED_SWITCH is set in the host's environment, oracle lines go only to private server logs, there are no admin routes, and a simple per-IP rate limit protects it.
+Hosted copy. Same code, same container image (section 15), run with one worker. PLANTED_SWITCH is set in the host's environment. **[Rev]** Details:
+- Oracle sink is chosen by `ORACLE_SINK=file|stdout` (default `file` locally). The hosted container uses `stdout`, so oracle lines go only to the host's private logs and nothing accumulates on the container disk (*must fix H6*).
+- The per-IP rate limit (60 requests per 10 seconds) must see the real client address. uvicorn runs with `--proxy-headers --forwarded-allow-ips="*"` behind the host's TLS proxy; without it every visitor shares one limit (*must fix H2*).
+- Players and rate-limit buckets expire after 30 minutes idle, capped at 5,000 players (*must fix M1*).
+- `GET /healthz` returns `{"ok": true}` for the container healthcheck. It is not an admin route: it reads and changes nothing.
+- The `pid` cookie is `Secure` when the request arrived over HTTPS (*must fix L3*).
+- There are no admin routes and no route can read or change the switch.
 ## 6. Component 2: the agent walker
 Each session is driven by an LLM agent playing a written persona. Our code is the agent's eyes and hands: it reads a typed state from the page, sends it to the model, checks the tool call against the allowed actions, and clicks. The personas are identical except for one sentence about buying a cosmetic, so any difference in treatment traces back to that purchase.
 
@@ -241,7 +251,9 @@ Batches. The orchestrator starts the local server with the batch's switch settin
 | ON | on | 60 spender + 60 free + 60 free_twin, interleaved | V1 sensitivity, V3 A/A, V5 recovery |
 | OFF | off | 60 spender + 60 free, interleaved | V2 specificity |
 
-free_twin runs inside the ON batch, so the A/A comparison shares the server, model and hour with free. Jobs are (persona, seed) pairs shuffled with a fixed master seed, and seeds are unique across all batches. Each session has a 120-second timeout and one retry; every failure is counted as attrition.
+free_twin runs inside the ON batch, so the A/A comparison shares the server, model and hour with free. Jobs are (persona, seed) pairs shuffled with a fixed master seed, and seeds are unique across all batches. Each session has a 120-second timeout and one retry; every failure is counted as attrition. **[Rev, must fix C3]** Each attempt gets its own session ID (`<run>-<persona>-<seed>-a<N>`), its own hash chain and a status of `failed:<reason>` or the final status. Only the last attempt of each (persona, seed) enters the analysis; earlier attempts stay in the evidence store and count as attrition.
+
+**[Rev] Config values.** PyYAML reads bare `on`/`off`/`yes`/`no` as booleans. Every config and `prereg.yaml` quotes them (`label: "on"`, `switch: "on"`, `batch: "on"`), and a loader schema rejects non-string labels (*must fix C1*). The switch is declared once, in the batch config; `scripts/run_demo.py` reads it from there rather than keeping its own copy (M2). The plan hash also covers the `--llm` mode, so approving a fake run never approves a real one (M8).
 Where runs happen. Measured batches use the local server, where the oracle log is available. The live demo plays 2 sessions on the hosted copy. Free hosts can sleep when idle, so open the hosted game a few minutes before the demo.
 ## 7. Component 3: the evidence store and graph
 One SQLite file holds every observation, hash-chained so any later edit is detectable. The same file holds the graph tables both views draw from.
@@ -271,7 +283,9 @@ Integrity.
 - python -m evidence verify <run_id> recomputes everything and prints OK or the first mismatch.
 This is tamper-evident, not tamper-proof: someone with write access could rebuild the chain. Committing each manifest hash to git before analysis closes most of that gap for the demo.
 Evidence pack (P2). A zip of the manifest, results.json, prereg.yaml, a one-page methods note, sample screenshots and the verify output. Export is enabled only after a finding approval exists for that run.
-Public snapshot. scripts/export_snapshot.py copies data/evidence.db with SQLite's backup API, plus the screenshots it references, into snapshot/. That folder is committed, since it holds only our own test-game data. Public mode reads snapshot/ and nothing else.
+Public snapshot. scripts/export_snapshot.py copies data/evidence.db with SQLite's backup API, plus the screenshots it references, into snapshot/. That folder is committed, since it holds only our own test-game data. Public mode reads snapshot/ and nothing else. **[Rev, must fix H1]** Before committing, the export replaces each approver's name with initials in `approvals` and drops the `spend` table's per-call rows (keeping one total per run), so no personal data is published. It also copies `data/validation/*.json` to `snapshot/validation/` for the Validation page.
+
+**[Rev] Results table.** `results` has a unique key on `(run_id, contrast, metric)`; re-running the analysis replaces rows instead of duplicating them (*must fix M4*). Screenshot rows are written through the same writer queue as events, so there is truly one writer (M6). Spend rows carry a `mode` column (`fake` or `real`), and each cap counts only its own mode (M3).
 ## 8. Component 4: the statistics layer
 The session is the unit of analysis, four metrics are pre-registered, and every result gets one of four verdicts from a fixed rule. A planted effect must be detected, and a missing effect must be shown as equivalent, not just "not significant".
 
@@ -279,11 +293,11 @@ The session is the unit of analysis, four metrics are pre-registered, and every 
 |---|---|---|---|---|
 | M1 | Offers shown ÷ losses | Primary | ±0.15 | +0.50 (0.8 vs 0.3) |
 | M2 | Mean best displayed door chance on levels that follow a loss | Primary | ±3 points | −10.5 points (0.7 × 15) |
-| M3 | Win rate over 10 levels | Secondary, a consequence | ±0.10 | Negative, size unknown |
+| M3 | Win rate over levels resolved **[Rev]** (10 in a complete session) | Secondary, a consequence | ±0.10 | Negative, size unknown |
 | M4 | Mean offer price shown | Negative control | ±12 gems | 0 |
 | B1 | Share of picks that took the best displayed door | Balance check: do personas play alike? | ±0.10 | 0 |
 
-Sessions with zero losses have no M1 or M2 value, and sessions with no offer have no M4 value; they are excluded from those metrics only, and the counts are reported. Contrasts are always A minus B, with B = free. Sessions flagged as protocol deviations stay in the primary analysis, and a sensitivity analysis excludes them.
+**[Rev]** Contrasts are chosen from the run's recorded switch (a new `runs.switch` column written by `walker run`, *must fix C1*), not from its label. Sessions with zero losses have no M1 or M2 value, and sessions with no offer have no M4 value; they are excluded from those metrics only, and the counts are reported. Contrasts are always A minus B, with B = free. Sessions flagged as protocol deviations stay in the primary analysis, and a sensitivity analysis excludes them.
 Estimation, per metric and contrast (stats/analysis.py):
 - Difference in means with a 95% Welch CI, computed directly: standard error from both sample variances, Welch–Satterthwaite degrees of freedom, quantile from scipy.stats.t.ppf. A unit test checks the p-value against scipy.stats.ttest_ind(a, b, equal_var=False).
 - Bootstrap percentile CI as a robustness check: 10,000 resamples, seed 2026.
@@ -402,7 +416,13 @@ fairplay/
   .claude/settings.json
   .env                      # ANTHROPIC_API_KEY, gitignored
   .gitignore                # .env, data/, oracle/, .venv/
-  requirements.txt          # pinned versions
+  pyproject.toml            # [Rev] extras: game, dashboard, walker, dev
+  uv.lock                   # [Rev] generated lock, reviewed per S13
+  Dockerfile.game           # [Rev] section 15
+  Dockerfile.dashboard      # [Rev] section 15
+  docker-compose.yml        # [Rev] local game + public dashboard
+  .dockerignore             # [Rev] excludes .env, data/, oracle/, .venv/
+  .github/workflows/ci.yml  # [Rev] tests, ruff, S6 scan, image build
   prereg.yaml
   docs/SPEC.md              # this doc
   configs/                  # personas.yaml, pricing.yaml, run_pilot.yaml, run_on.yaml, run_off.yaml
@@ -555,7 +575,11 @@ Assumptions (not verified)
 - About 50 requests per minute at the entry tier comes from third-party guides; the Console's Limits page is authoritative.
 - These details come from memory, not checked docs, and each has a test or a fallback in its task: client.messages.with_raw_response, the anthropic-ratelimit-input-tokens-limit header, disable_parallel_tool_use, st.fragment(run_every=...), and Chromium's --host-resolver-rules flag.
 - The Pro plan has enough Claude Code usage for about 10 build tasks in a day and a half.
+**[Rev] Validation scope.** The oracle line gains a `run_tag` set from the `RUN_TAG` env var the orchestrator passes to the server, so V5 compares a run only against its own ground truth (H5).
+
 Open questions
+- ☐ **[Rev]** Which container host? Section 15 is host-neutral; the answer only changes the deploy command.
+- ☐ **[Rev]** Keep approver initials in the public snapshot, or drop approvals entirely?
 - ☐ What does the Console's Limits page show for our key? It sets how long the batches take.
 - ☐ Does Build North require a specific host, or proof of deployment beyond a working link?
 - ☐ Are there rules on pre-existing code, AI-tool disclosure or data handling?
@@ -569,3 +593,36 @@ Sources
 - Claude Haiku 5.5 migration guide, Claude Platform Docs
 - Rate limits, Claude Platform Docs
 - Configure permissions, Claude Code Docs
+
+## 15. Containerization and deployment **[Rev, new]**
+
+Two images, one language, built from the same repo. Neither image contains the anthropic SDK, Playwright, `.env`, `data/` or `oracle/`. The walker stays on the laptop, outside containers, because it needs the API key and a real Chromium.
+
+| Image | Installs | Runs | Port | Reads |
+|---|---|---|---|---|
+| `fairplay-game` | `.[game]`: fastapi, uvicorn | `uvicorn game.server:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers --forwarded-allow-ips="*"` | `$PORT` (default 8000) | `game/` only |
+| `fairplay-dashboard` | `.[dashboard]`: streamlit, plotly, pandas, numpy, scipy, statsmodels, networkx, pyyaml | `streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port $PORT` with `FAIRPLAY_MODE=public` | `$PORT` (default 8501) | `snapshot/`, `prereg.yaml`, `contextgraph/` |
+
+**Image rules**
+
+- Base `python:3.11-slim` (matching the Python 3.11 convention), pinned by digest in the Dockerfile. Multi-stage: dependencies install from `uv.lock` in a builder stage, and only the virtualenv plus the app folders the image needs are copied into the final stage.
+- `WORKDIR /app` is the repo root, because paths such as `snapshot/` and `prereg.yaml` are relative to it.
+- Runs as a non-root user with a read-only root filesystem; the game gets a small `tmpfs` at `/tmp` only.
+- `HEALTHCHECK` calls `/healthz` (game) and `/_stcore/health` (Streamlit) using Python's standard library inside the container, so no curl is installed.
+- `ORACLE_SINK=stdout` and `PLANTED_SWITCH` are set by the host, never baked into the image.
+- `.dockerignore` excludes `.env*`, `data/`, `oracle/`, `.venv/`, `.git/`, `tests/`, `*.docx`.
+- A CI step fails the build if `anthropic`, `playwright` or `ANTHROPIC_API_KEY` appears in either final image (S12).
+
+**Local**
+
+```
+docker compose up --build        # game on 127.0.0.1:8000, dashboard on 127.0.0.1:8501
+```
+
+Compose publishes both ports on `127.0.0.1` only, so nothing is reachable from venue Wi-Fi, matching section 4. Measured batches still run against the local game (in or out of a container) because that is where the oracle is written; with the containerized game, compose mounts `./oracle` and sets `ORACLE_SINK=file`.
+
+**Hosted**
+
+Any host that runs a container behind HTTPS and supplies `$PORT` works (the choice is an open question in section 14). Deploy the game with `PLANTED_SWITCH` set and one instance only, since state is in memory. Deploy the dashboard from a commit whose `snapshot/` is current. After deploying, put the game's HTTPS origin into `HOSTED` in `walker/guard.py` (a code change, per S1).
+
+**CI** (`.github/workflows/ci.yml`): on every push, run `ruff check`, `ruff format --check`, `pytest -q`, build both images, and run the S12 image scan. No deploy step runs from CI: deploying stays a human action, consistent with S14.
