@@ -157,10 +157,12 @@ def test_a_full_session_runs_ten_levels_and_writes_ten_oracle_lines(make_server)
     assert [line["level_no"] for line in lines] == list(range(1, 11))
 
 
-def test_an_offer_after_level_nine_does_not_end_the_session_early(make_server) -> None:
+def test_an_offer_after_level_nine_does_not_end_the_session_early(make_server, monkeypatch) -> None:
     """Targeted spenders see the most offers, so a truncation here would be
     correlated with the planted rule itself (audit C2)."""
-    client, _, _ = make_server("on")
+    client, server, _ = make_server("on")
+    # 40 sessions from one test client would trip the per-IP limit; it is not under test here.
+    monkeypatch.setattr(server, "RATE_MAX_REQUESTS", 10**6)
     saw_level_nine_offer = False
     for seed in range(1, 41):
         client.post(f"/api/session/start?seed={seed}")
