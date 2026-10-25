@@ -1,0 +1,13 @@
+# Secrets and private data never enter a build context (S12). The Dockerfiles
+# also COPY named folders only; this is the second lock.
+.env
+.env.*
+data/
+oracle/
+.venv/
+.git/
+.claude/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.streamlit/secrets.toml
