@@ -1,7 +1,7 @@
 label: pilot
 # Measured batches use the LOCAL server, because that is where the oracle log is.
 origin: http://127.0.0.1:8000
-switch: on
+switch: "on"
 model: claude-haiku-5-5
 concurrency: 4
 master_seed: 20261023

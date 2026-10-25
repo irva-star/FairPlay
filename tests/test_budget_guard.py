@@ -77,7 +77,8 @@ def test_plan_refuses_when_the_estimate_exceeds_what_is_left() -> None:
 
 
 def test_per_session_cap_is_tracked_separately() -> None:
-    guard = BudgetGuard(PRICES, cap_usd=10.0, per_session_cap_usd=0.0002)
+    # One step costs $0.00015, so the cap must sit below that for one step to cross it.
+    guard = BudgetGuard(PRICES, cap_usd=10.0, per_session_cap_usd=0.0001)
     assert not guard.session_over_cap("s1")
     guard.record(Usage(input_tokens=1200, output_tokens=60), session_id="s1")
     assert guard.session_over_cap("s1")

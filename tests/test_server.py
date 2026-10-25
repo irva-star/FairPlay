@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -156,6 +157,32 @@ def test_a_full_session_runs_ten_levels_and_writes_ten_oracle_lines(make_server)
     assert [line["level_no"] for line in lines] == list(range(1, 11))
 
 
+def test_an_offer_after_level_nine_does_not_end_the_session_early(make_server) -> None:
+    """Targeted spenders see the most offers, so a truncation here would be
+    correlated with the planted rule itself (audit C2)."""
+    client, _, _ = make_server("on")
+    saw_level_nine_offer = False
+    for seed in range(1, 41):
+        client.post(f"/api/session/start?seed={seed}")
+        client.post("/api/store/buy", json={"item_id": "gold_frame"})
+        levels = 0
+        for _ in range(40):
+            current = client.get("/api/level/current").json()
+            if not current["doors"]:
+                break
+            level = current["level_no"]
+            pick = client.post("/api/level/pick", json={"door": 0}).json()
+            levels += 1
+            if pick["offer"]:
+                saw_level_nine_offer |= level == R.LEVELS_TOTAL - 1
+                dismissed = client.post("/api/offer/dismiss").json()
+                assert dismissed["done"] == (level == R.LEVELS_TOTAL), (seed, level)
+            if pick["done"]:
+                break
+        assert levels == R.LEVELS_TOTAL, f"seed {seed} ended after {levels} levels"
+    assert saw_level_nine_offer, "no seed exercised an offer on level 9; widen the range"
+
+
 def test_the_oracle_records_every_field_the_validation_needs(make_server) -> None:
     client, _, oracle = make_server("on")
     client.post("/api/session/start?seed=5")
@@ -278,8 +305,9 @@ def test_the_page_says_it_is_a_test_game(make_server) -> None:
 
 def test_the_client_has_no_css_animations() -> None:
     css = Path("game/static/style.css").read_text(encoding="utf-8")
-    assert "animation" not in css
-    assert "transition" not in css
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)  # the header comment says "No animations"
+    assert not re.search(r"\banimation(-[a-z-]+)?\s*:", css)
+    assert not re.search(r"\btransition(-[a-z-]+)?\s*:", css)
     assert "@keyframes" not in css
 
 

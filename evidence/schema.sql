@@ -4,7 +4,8 @@
 
 CREATE TABLE IF NOT EXISTS runs(
   run_id TEXT PRIMARY KEY, label TEXT, created_at TEXT, config_hash TEXT,
-  plan_hash TEXT, approval_id INTEGER, git_commit TEXT, status TEXT);
+  plan_hash TEXT, approval_id INTEGER, git_commit TEXT, status TEXT,
+  switch TEXT);  -- the server's PLANTED_SWITCH for this run: 'on' or 'off'
 
 CREATE TABLE IF NOT EXISTS approvals(
   approval_id INTEGER PRIMARY KEY,
@@ -46,5 +47,6 @@ CREATE TABLE IF NOT EXISTS spend(
 
 CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id, seq);
 CREATE INDEX IF NOT EXISTS idx_sessions_run ON sessions(run_id);
-CREATE INDEX IF NOT EXISTS idx_results_run ON results(run_id, contrast, metric);
+-- One row per (run, contrast, metric): re-running the analysis replaces rows.
+-- Created in store.py after older databases are de-duplicated.
 CREATE INDEX IF NOT EXISTS idx_spend_run ON spend(run_id);

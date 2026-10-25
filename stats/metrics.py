@@ -36,7 +36,7 @@ class SessionMetrics:
     best_picks: int
     m1: float | None = None   # offers shown / losses
     m2: float | None = None   # mean best displayed chance on post-loss levels
-    m3: float | None = None   # win rate over 10 levels
+    m3: float | None = None   # win rate over levels resolved (10 when complete)
     m4: float | None = None   # mean offer price
     b1: float | None = None   # share of picks taking the best displayed door
 
@@ -94,7 +94,8 @@ def session_metrics(conn, session_id: str) -> SessionMetrics:
     )
     m.m1 = (offers / losses) if losses else None
     m.m2 = statistics.fmean(post_loss_best.values()) if post_loss_best else None
-    m.m3 = wins / LEVELS_TOTAL
+    # Over levels actually resolved: a session cut short must not read as losses.
+    m.m3 = (wins / m.levels_resolved) if m.levels_resolved else None
     m.m4 = statistics.fmean(offer_prices) if offer_prices else None
     m.b1 = (best_picks / picks) if picks else None
     return m
@@ -106,9 +107,12 @@ NON_GAMEPLAY_PERSONAS = ("guard",)
 
 
 def run_metrics(conn, run_id: str) -> list[SessionMetrics]:
+    """One row per (persona, seed): its last attempt. Earlier attempts are attrition."""
     placeholders = ",".join("?" * len(NON_GAMEPLAY_PERSONAS))
     ids = [r[0] for r in conn.execute(
-        f"SELECT session_id FROM sessions WHERE run_id=? AND persona NOT IN ({placeholders})"
+        f"SELECT session_id FROM sessions s WHERE run_id=? AND persona NOT IN ({placeholders})"
+        " AND COALESCE(attempts, 1) = (SELECT MAX(COALESCE(attempts, 1)) FROM sessions t"
+        "   WHERE t.run_id = s.run_id AND t.persona = s.persona AND t.seed = s.seed)"
         " ORDER BY session_id",
         (run_id, *NON_GAMEPLAY_PERSONAS),
     )]

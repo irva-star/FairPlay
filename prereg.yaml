@@ -45,11 +45,11 @@ metrics:
     expected_effect_switch_on: -10.5
     excluded_when: "session has zero losses"
   M3:
-    description: "Win rate over 10 levels"
+    description: "Win rate over levels resolved (10 in a complete session)"
     role: secondary
     margin: 0.10
     expected_effect_switch_on: "negative, size unknown"
-    excluded_when: null
+    excluded_when: "session resolved no levels"
   M4:
     description: "Mean offer price shown"
     role: negative_control
@@ -66,9 +66,9 @@ metrics:
 
 # Contrasts are always A minus B, with B = free.
 contrasts:
-  V1_sensitivity: {batch: on,  a: spender,   b: free}
-  V2_specificity: {batch: off, a: spender,   b: free}
-  V3_aa:          {batch: on,  a: free_twin, b: free}
+  V1_sensitivity: {batch: "on", a: spender,   b: free}
+  V2_specificity: {batch: "off", a: spender,   b: free}
+  V3_aa:          {batch: "on", a: free_twin, b: free}
 
 multiplicity:
   method: holm

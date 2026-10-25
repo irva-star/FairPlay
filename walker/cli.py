@@ -131,8 +131,23 @@ class Plan:
         return _sha256(_canonical(self.hashable()))
 
 
+def _check_config(config: dict, config_path: str | Path) -> None:
+    """Reject YAML 1.1 surprises: a bare `on` or `off` loads as a boolean.
+
+    An unquoted `label: on` used to become the run label "True", and no analysis
+    contrast ever matched it. Quote the values: `label: "on"`, `switch: "on"`.
+    """
+    label = config.get("label")
+    if not isinstance(label, str) or not label:
+        raise ValueError(f"{config_path}: label must be a quoted string, got {label!r}")
+    switch = config.get("switch")
+    if switch not in ("on", "off"):
+        raise ValueError(f"{config_path}: switch must be \"on\" or \"off\" (quoted), got {switch!r}")
+
+
 def build_plan(config_path: str | Path, *, concurrency: int | None = None) -> Plan:
     config = load_yaml(config_path)
+    _check_config(config, config_path)
     personas_cfg = load_yaml(PERSONAS_PATH)["personas"]
 
     personas = {name: int(n) for name, n in (config.get("personas") or {}).items()}
@@ -141,9 +156,9 @@ def build_plan(config_path: str | Path, *, concurrency: int | None = None) -> Pl
             raise ValueError(f"persona {name!r} is not defined in {PERSONAS_PATH}")
 
     plan = Plan(
-        label=str(config["label"]),
+        label=config["label"],
         origin=str(config["origin"]),
-        switch="on" if config.get("switch") in (True, "on") else "off",
+        switch=config["switch"],
         model=str(config.get("model", "claude-haiku-5-5")),
         personas=personas,
         seed_base=int(config.get("seed_base", 0)),
@@ -259,7 +274,7 @@ async def _run_batch(plan: Plan, pricing: Pricing, store: EvidenceStore,
     personas_cfg = load_yaml(PERSONAS_PATH)["personas"]
     run_id = f"{plan.label}-{uuid.uuid4().hex[:8]}"
     approval = store.find_approval(kind="run_plan", object_hash=plan.plan_hash)
-    store.create_run(run_id, label=plan.label, config_hash=plan.config_hash,
+    store.create_run(run_id, label=plan.label, switch=plan.switch, config_hash=plan.config_hash,
                      plan_hash=plan.plan_hash, approval_id=approval["approval_id"],
                      git_commit=git_commit(), status="running")
 
@@ -278,9 +293,12 @@ async def _run_batch(plan: Plan, pricing: Pricing, store: EvidenceStore,
 
             async def one(persona: str, seed: int) -> None:
                 async with semaphore:
-                    session_id = f"{run_id}-{persona}-{seed}"
                     attempts = pricing.limits.session_retries + 1
                     for attempt in range(1, attempts + 1):
+                        # Each attempt is its own session with its own hash chain,
+                        # so a retry never appends to a failed attempt's events.
+                        # The analysis keeps only the last attempt per seed.
+                        session_id = f"{run_id}-{persona}-{seed}-a{attempt}"
                         store.start_session(session_id, run_id=run_id, persona=persona,
                                             seed=seed, attempts=attempt)
                         try:
@@ -316,8 +334,8 @@ async def _run_batch(plan: Plan, pricing: Pricing, store: EvidenceStore,
                             return
                         except Exception as exc:  # noqa: BLE001 - every failure is attrition
                             label = type(exc).__name__
+                            store.end_session(session_id, status=f"failed:{label}")
                             if attempt >= attempts:
-                                store.end_session(session_id, status=f"failed:{label}")
                                 print(f"  {session_id}: failed after {attempt} attempts ({label})")
                             else:
                                 print(f"  {session_id}: attempt {attempt} failed ({label}), retrying")

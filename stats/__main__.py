@@ -32,11 +32,16 @@ def prereg_hash() -> str:
     return hashlib.sha256(PREREG.read_bytes()).hexdigest()
 
 
-def contrasts_for(label: str, prereg: dict) -> dict[str, dict]:
-    """Only the contrasts whose batch matches this run's switch setting."""
-    batch = "on" if label.lower() in ("on", "pilot") else "off"
+def contrasts_for(switch: str, prereg: dict) -> dict[str, dict]:
+    """Only the contrasts whose batch matches the switch the run was recorded with."""
+    if switch not in ("on", "off"):
+        raise ValueError(f"run switch must be 'on' or 'off', got {switch!r}")
+    for name, spec in prereg["contrasts"].items():
+        if spec["batch"] not in ("on", "off"):
+            raise ValueError(f"prereg contrast {name}: batch must be quoted \"on\" or \"off\", "
+                             f"got {spec['batch']!r}")
     return {name: spec for name, spec in prereg["contrasts"].items()
-            if str(spec["batch"]).lower() == batch}
+            if spec["batch"] == switch}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -54,11 +59,16 @@ def main(argv: list[str] | None = None) -> int:
     margins = {k: float(v["margin"]) for k, v in prereg["metrics"].items()}
 
     with EvidenceStore(args.db) as store:
-        run = store.conn.execute("SELECT label FROM runs WHERE run_id=?", (args.run_id,)).fetchone()
+        run = store.conn.execute("SELECT label, switch FROM runs WHERE run_id=?",
+                                 (args.run_id,)).fetchone()
         if run is None:
             print(f"no such run: {args.run_id}", file=sys.stderr)
             return 1
-        label = run["label"]
+        label, switch = run["label"], run["switch"]
+        if switch is None:
+            print(f"run {args.run_id} has no recorded switch (made before it was stored); "
+                  "re-run the batch", file=sys.stderr)
+            return 1
 
         rows = M.run_metrics(store.conn, args.run_id)
         if not rows:
@@ -67,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         M.persist(store, rows)
 
         missing = M.missing_counts(rows)
-        print(f"run {args.run_id} ({label}): {len(rows)} sessions")
+        print(f"run {args.run_id} ({label}, switch {switch}): {len(rows)} sessions")
         print("  sessions missing each metric: "
               + ", ".join(f"{k} {v}" for k, v in missing.items()))
         noncompliant = [r.session_id for r in rows if not r.compliant]
@@ -86,10 +96,10 @@ def main(argv: list[str] | None = None) -> int:
             print("\n" + format_power_table(power_table(
                 sigmas, margins, n_planned=int(prereg["sessions_per_persona"]))))
 
-        payload: dict = {"run_id": args.run_id, "label": label,
+        payload: dict = {"run_id": args.run_id, "label": label, "switch": switch,
                          "prereg_hash": prereg_hash(), "contrasts": {}}
 
-        for name, spec in contrasts_for(label, prereg).items():
+        for name, spec in contrasts_for(switch, prereg).items():
             a, b = spec["a"], spec["b"]
             by_metric = {
                 metric: M.contrast_values(rows, metric, a, b,

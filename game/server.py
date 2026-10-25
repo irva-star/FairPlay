@@ -54,6 +54,7 @@ class Player:
     owned: set[str] = field(default_factory=set)
     last_result: str = R.RESULT_NONE
     offer_price: int | None = None
+    levels_resolved: int = 0
     done: bool = False
 
     @property
@@ -208,6 +209,7 @@ async def level_pick(body: PickBody, pid: str | None = Cookie(default=None)) -> 
 
     p.last_result = R.RESULT_WIN if won else R.RESULT_LOSS
     p.offer_price = offer
+    p.levels_resolved = level
     if level >= R.LEVELS_TOTAL:
         # Stay on the last level; a pending offer must be dismissed before the
         # session can end, so the agent always gets to act on it.
@@ -231,7 +233,10 @@ async def offer_dismiss(pid: str | None = Cookie(default=None)) -> dict:
     if p.offer_price is None:
         raise HTTPException(status_code=409, detail="no offer to dismiss")
     p.offer_price = None
-    if p.level_no >= R.LEVELS_TOTAL:
+    # Done only once level 10 itself is resolved. level_no has already moved on
+    # to the next level, so after an offer on level 9 it reads 10 while level 10
+    # is still unplayed; checking it here ended those sessions a level early.
+    if p.levels_resolved >= R.LEVELS_TOTAL:
         # The offer was the last thing standing between us and the end.
         p.done = True
     return {"done": p.done, "next_level": None if p.done else p.level_no}

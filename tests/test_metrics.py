@@ -143,7 +143,7 @@ def test_grouping_and_missing_counts(tmp_path: Path) -> None:
     assert set(grouped) == {"spender", "free", "free_twin"}
 
     a, b = M.contrast_values(rows, "M3", "spender", "free")
-    assert a == [0.0] and b == [0.1]
+    assert a == [0.0] and b == [1.0], "M3 is over levels resolved, one each here"
 
     missing = M.missing_counts(rows)
     assert missing["M1"] == 2, "the two winners have no offers-per-loss"
@@ -183,6 +183,44 @@ def test_the_guard_pseudo_session_stays_out_of_the_analysis(tmp_path: Path) -> N
 
     rows = M.run_metrics(store.conn, "r1")
     assert [r.persona for r in rows] == ["free"]
+    store.close()
+
+
+def test_m3_is_over_levels_resolved_not_a_fixed_ten(tmp_path: Path) -> None:
+    """A session cut short must not have its missing levels read as losses."""
+    events = [("session_start", {}), *[level_end(n, "WIN") for n in range(1, 10)],
+              ("session_end", {"compliant": True})]
+    store = build(tmp_path, events)
+    m = M.session_metrics(store.conn, "s1")
+    assert m.levels_resolved == 9
+    assert m.m3 == pytest.approx(1.0)
+    store.close()
+
+
+def test_only_the_last_attempt_of_a_retried_session_is_analysed(tmp_path: Path) -> None:
+    """Audit C3: attempt 1's events must not merge into attempt 2's."""
+    store = EvidenceStore(tmp_path / "e.db")
+    store.create_run("r1", label="on", switch="on")
+    win = {"level": 1, "result": "WIN", "door": 0, "chosen_chance": 60,
+           "best_chance": 60, "chose_best": True}
+    for attempt, status, levels in [(1, "failed:TimeoutError", 3), (2, "ok", 10)]:
+        sid = f"r1-free-7-a{attempt}"
+        store.start_session(sid, run_id="r1", persona="free", seed=7, attempts=attempt)
+        for _ in range(levels):
+            store.append_event(sid, type="level_end", payload=win)
+        store.end_session(sid, status=status)
+    store.start_session("r1-free-8-a1", run_id="r1", persona="free", seed=8, attempts=1)
+    store.append_event("r1-free-8-a1", type="level_end", payload=win)
+    store.end_session("r1-free-8-a1", status="ok")
+
+    rows = M.run_metrics(store.conn, "r1")
+    assert sorted(r.session_id for r in rows) == ["r1-free-7-a2", "r1-free-8-a1"]
+    assert {r.session_id: r.wins for r in rows}["r1-free-7-a2"] == 10
+    assert all(r.m3 <= 1.0 for r in rows)
+    # The failed attempt stays in the evidence store as attrition.
+    statuses = [r[0] for r in store.conn.execute(
+        "SELECT status FROM sessions WHERE seed=7 ORDER BY attempts")]
+    assert statuses == ["failed:TimeoutError", "ok"]
     store.close()
 
 
