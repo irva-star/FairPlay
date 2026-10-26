@@ -115,7 +115,7 @@ def test_only_the_cli_and_llm_module_mention_the_key() -> None:
     mentioning = {
         path.relative_to(REPO)
         for path in python_files("game", "walker", "evidence", "stats",
-                                 "validation", "contextgraph", "dashboard")
+                                 "validation", "dashboard", "hub")
         if KEY in path.read_text(encoding="utf-8")
     }
     assert mentioning == {Path("walker/cli.py")}, mentioning
@@ -150,7 +150,7 @@ _ENV_FILE_RE = re.compile(r"\.env\b")
 def test_nothing_loads_the_env_file_except_the_walker() -> None:
     """The hosted containers must not even have a code path that reads .env."""
     for path in python_files("game", "dashboard", "evidence", "stats",
-                             "validation", "contextgraph"):
+                             "validation", "hub"):
         source = path.read_text(encoding="utf-8")
         assert "load_env_file" not in source, path.relative_to(REPO)
         assert not _ENV_FILE_RE.search(source), (

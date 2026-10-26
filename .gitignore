@@ -16,3 +16,7 @@ __pycache__/
 # snapshot/ is deliberately NOT ignored: it holds only our own test-game data
 # and is what public dashboard mode reads.
 patches/
+
+# SQLite helper files, recreated whenever the snapshot is opened; never needed
+snapshot/*.db-shm
+snapshot/*.db-wal

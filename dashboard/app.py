@@ -32,10 +32,9 @@ PAGE_DIR = "dashboard/pages"
 results = st.Page(f"{PAGE_DIR}/results.py", title="Results", icon="📊", default=True)
 evidence = st.Page(f"{PAGE_DIR}/evidence.py", title="Evidence", icon="🔍")
 validation = st.Page(f"{PAGE_DIR}/validation.py", title="Validation", icon="✅")
-contextgraph = st.Page(f"{PAGE_DIR}/contextgraph_view.py", title="ContextGraph", icon="🕸️")
 methods = st.Page(f"{PAGE_DIR}/methods.py", title="Methods and limits", icon="📄")
 
-pages = [results, evidence, validation, contextgraph, methods]
+pages = [results, evidence, validation, methods]
 
 if not IS_PUBLIC:
     run_plans = st.Page(f"{PAGE_DIR}/run_plans.py", title="Run plans", icon="📋")

@@ -74,8 +74,6 @@ st.markdown("""
   analysis is what closes most of that gap.
 - **Agents, not people.** LLM personas are consistent and cheap, which is what makes the
   comparison clean, but they are not evidence about how humans would behave.
-- **Modelling choices in ContextGraph.** The order of the money path is a reconstruction
-  from public reporting, and every edge is labelled with how certain it is.
 """)
 
 st.subheader("Safety rules in force")
@@ -92,7 +90,6 @@ These are enforced in code and each is covered by a test, not left to good inten
   approves that exact run plan.
 - No real money, accounts, credentials or personal data. No private individuals anywhere
   in a graph.
-- Nothing in ContextGraph is crawled: a human read the reporting and typed it in.
 """)
 
 st.caption(f"Pre-registration hash `{prereg_hash()}` — the analysis plan was committed "

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FairPlay Labs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="brand" href="./"><span class="logo">⚖</span> FairPlay Labs</a>
+      <span class="banner">TEST GAME, planted rule (demo)</span>
+      <nav class="nav"><a class="btn primary" href="dashboard.html">Open the audit dashboard →</a></nav>
+    </div>
+
+    <section class="hero">
+      <h1>AI agents play <span class="grad">as different customers</span>,<br>statistics show who gets treated differently.</h1>
+      <p>Each persona is identical except for one sentence. Claude agents play the app as each persona,
+        every step is stored as tamper-evident evidence, and pre-registered statistics decide whether a
+        difference is real. Try the apps yourself, then see what the agents found.</p>
+    </section>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="toolbar">
+      <div class="seg" role="tablist" aria-label="Choose an app">
+        <button type="button" data-app="streamvault" class="on" role="tab">🎬 StreamVault</button>
+        <button type="button" data-app="doorrun" role="tab">🚪 Door Run</button>
+      </div>
+      <a class="btn" id="open-full" href="streamvault/" target="_blank" rel="noopener">Open full screen ↗</a>
+    </div>
+
+    <div class="stage">
+      <div class="frame">
+        <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span id="frame-url">/streamvault/</span></div>
+        <iframe id="app-frame" src="streamvault/" title="Audited app"></iframe>
+      </div>
+      <div class="side">
+        <div class="panel" id="app-blurb"></div>
+        <div class="panel">
+          <h3>How the audit works</h3>
+          <ol class="steps">
+            <li><b>Personas.</b> Twins that differ by one sentence, such as "rent a movie first".</li>
+            <li><b>Agents play.</b> Claude sees only typed numbers and buttons, never page text, and picks from a fixed list of actions.</li>
+            <li><b>Evidence.</b> Every step is hash-chained, so a later edit is detectable.</li>
+            <li><b>Statistics.</b> Welch CIs, Holm and TOST, all pre-registered, give each metric a verdict.</li>
+          </ol>
+          <a class="btn primary" href="dashboard.html" style="margin-top:6px">See the agents' audit →</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">A test app we wrote, with a planted rule. Nothing here is a finding about any real company,
+      product or person. Findings say "difference detected"; they cannot show intent.</div>
+  </div>
+
+<script>
+const BLURBS = {
+  streamvault: `<h3>🎬 StreamVault</h3>
+    <p>A fictional streaming signup with four copies, A to D. Each copy has one secret rule:
+      an extra fee at checkout, a longer cancellation maze, pre-ticked add-ons, or no trick at all.
+      The rule only applies to people who rented a movie first.</p>
+    <p><b>Spot the trap:</b> pick a copy and try it, then check the dashboard to see if the agents agree.</p>`,
+  doorrun: `<h3>🚪 Door Run</h3>
+    <p>A 10-level door game. Each level shows three doors with their win chances.
+      A planted switch can quietly lower the displayed chances after a loss for players who bought
+      something, and push more offers at them.</p>
+    <p>It is the calibration benchmark: we know the truth, so we can check the statistics recover it.</p>`,
+};
+const frame = document.getElementById("app-frame");
+const buttons = document.querySelectorAll(".seg button");
+function show(app) {
+  const path = app + "/";
+  frame.src = path;
+  document.getElementById("frame-url").textContent = "/" + path;
+  document.getElementById("open-full").href = path;
+  document.getElementById("app-blurb").innerHTML = BLURBS[app];
+  buttons.forEach((b) => b.classList.toggle("on", b.dataset.app === app));
+}
+buttons.forEach((b) => b.addEventListener("click", () => show(b.dataset.app)));
+show("streamvault");
+
+fetch("dashboard.json").then((r) => r.json()).then((d) => {
+  const t = d.totals;
+  const personas = new Set();
+  Object.values(d.apps).forEach((runs) => runs.forEach((r) => r.sessions.forEach((s) => personas.add(s.persona))));
+  const tiles = [
+    [t.agents, "agent sessions"], [t.steps.toLocaleString(), "agent decisions logged"],
+    [personas.size, "personas"], [t.runs, "audit runs"],
+  ];
+  document.getElementById("kpis").innerHTML = tiles.map(([v, l]) =>
+    `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+}).catch(() => {});
+</script>
+</body>
+</html>

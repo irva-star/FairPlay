@@ -66,12 +66,12 @@ function setLevel(payload) {
 }
 
 async function refreshLevel() {
-  const { data } = await api("/api/level/current");
+  const { data } = await api("api/level/current");
   setLevel(data);
 }
 
 async function start() {
-  const { data } = await api(`/api/session/start?seed=${encodeURIComponent(SEED)}`, {});
+  const { data } = await api(`api/session/start?seed=${encodeURIComponent(SEED)}`, {});
   $("gems").textContent = String(data.gems);
   $("levels-total").textContent = String(data.levels_total);
   $("levels-played").textContent = String(data.levels_total);
@@ -92,7 +92,7 @@ $("close-store").addEventListener("click", async () => {
 });
 
 $("buy-gold-frame").addEventListener("click", async () => {
-  const { ok, status, data } = await api("/api/store/buy", { item_id: "gold_frame" });
+  const { ok, status, data } = await api("api/store/buy", { item_id: "gold_frame" });
   if (ok) {
     $("gems").textContent = String(data.gems);
     $("store-note").textContent = "Bought.";
@@ -104,7 +104,7 @@ $("buy-gold-frame").addEventListener("click", async () => {
 
 for (let i = 0; i < 3; i += 1) {
   $(`door-${i}`).addEventListener("click", async () => {
-    const { data } = await api("/api/level/pick", { door: i });
+    const { data } = await api("api/level/pick", { door: i });
     levelsPlayed += 1;
     if (data.result === "WIN") { wins += 1; }
     $("wins").textContent = String(wins);
@@ -125,7 +125,7 @@ for (let i = 0; i < 3; i += 1) {
 }
 
 $("offer-dismiss").addEventListener("click", async () => {
-  const { data } = await api("/api/offer/dismiss", {});
+  const { data } = await api("api/offer/dismiss", {});
   if (data.done) {
     screen = "done";
   } else {

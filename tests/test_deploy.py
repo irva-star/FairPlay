@@ -17,7 +17,7 @@ ALLOWED_COPIES = {
     "game.Dockerfile": {"requirements.txt", "game/"},
     "dashboard.Dockerfile": {
         "requirements.txt", ".streamlit/", "prereg.yaml",
-        "dashboard/", "stats/", "contextgraph/", "snapshot/",
+        "dashboard/", "stats/", "snapshot/",
     },
 }
 

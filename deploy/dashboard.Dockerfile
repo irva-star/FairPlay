@@ -16,7 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.txt /tmp/requirements.txt
-RUN grep -E '^(numpy|pandas|scipy|statsmodels|plotly|networkx|streamlit|pyyaml)(==|>=)' \
+RUN grep -E '^(numpy|pandas|scipy|statsmodels|plotly|streamlit|pyyaml)(==|>=)' \
         /tmp/requirements.txt > /tmp/req-dashboard.txt \
     && pip install --no-cache-dir -r /tmp/req-dashboard.txt \
     && rm /tmp/requirements.txt /tmp/req-dashboard.txt
@@ -25,7 +25,6 @@ COPY .streamlit/ .streamlit/
 COPY prereg.yaml ./
 COPY dashboard/ dashboard/
 COPY stats/ stats/
-COPY contextgraph/ contextgraph/
 COPY snapshot/ snapshot/
 
 RUN useradd --create-home app

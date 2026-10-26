@@ -266,8 +266,10 @@ def _register(copy: str) -> None:
         m = Member(pid=pid, seed=int(seed), copy=copy)
         MEMBERS[pid] = m
         secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+        # root_path is set when this app is mounted under the hub (e.g. "/streamvault").
+        root = request.scope.get("root_path", "")
         response.set_cookie(_cookie(copy), pid, httponly=True, samesite="strict", secure=secure,
-                            path=f"{prefix}/" if prefix else "/")
+                            path=f"{root}{prefix}/")
         return state(m)
 
     async def get_state(request: Request) -> dict:
@@ -288,8 +290,8 @@ def _register(copy: str) -> None:
     app.add_api_route(f"{prefix}/api/state", get_state, methods=["GET"])
     app.add_api_route(f"{prefix}/api/act", act, methods=["POST"])
     if prefix:
-        async def to_slash() -> RedirectResponse:
-            return RedirectResponse(f"{prefix}/")
+        async def to_slash(request: Request) -> RedirectResponse:
+            return RedirectResponse(f"{request.scope.get('root_path', '')}{prefix}/")
         app.add_api_route(prefix, to_slash, methods=["GET"])
 
 
@@ -305,11 +307,13 @@ if "" not in COPIES:
     async def chooser() -> str:
         """The 'spot the trap' landing page linking to every copy (never the rules)."""
         links = "\n    ".join(
-            f'<a class="copy" href="/{c}/"><div class="letter">{c.upper()}</div>'
+            f'<a class="copy" href="{c}/"><div class="letter">{c.upper()}</div>'
             f'<div class="small">StreamVault copy {c.upper()}</div></a>'
             for c in sorted(COPIES))
         html = (STATIC_DIR / "chooser.html").read_text(encoding="utf-8")
-        safe_url = DASHBOARD_URL if DASHBOARD_URL.startswith(("https://", "http://", "#")) else "#"
+        # A same-site path ("/dashboard.html") is fine; "//host" would be another site.
+        same_site = DASHBOARD_URL.startswith("/") and not DASHBOARD_URL.startswith("//")
+        safe_url = DASHBOARD_URL if same_site or DASHBOARD_URL.startswith(("https://", "http://", "#")) else "#"
         return html.replace("{{COPY_LINKS}}", links).replace("{{DASHBOARD_URL}}", safe_url)
 
 

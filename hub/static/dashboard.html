@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audit Dashboard · FairPlay Labs</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="brand" href="./"><span class="logo">⚖</span> FairPlay Labs</a>
+      <span class="banner">TEST GAME, planted rule (demo)</span>
+      <nav class="nav"><a class="btn" href="./">← Landing page</a></nav>
+    </div>
+
+    <section class="hero" style="padding-top:12px">
+      <h1>Audit <span class="grad">dashboard</span></h1>
+      <p>Replay the agents as they played each persona, then see what the statistics concluded.</p>
+    </section>
+
+    <div class="toolbar">
+      <div class="seg" id="app-seg">
+        <button type="button" data-app="streamvault" class="on">🎬 StreamVault</button>
+        <button type="button" data-app="doorrun">🚪 Door Run</button>
+      </div>
+      <div class="seg small" id="run-seg"></div>
+    </div>
+    <div id="run-meta" style="margin:10px 0"></div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="section">
+      <div class="toolbar">
+        <div><h2>Agents at work</h2>
+          <p class="sub">One card per agent session, grouped by persona. Click a card to read every step and the agent's stated reason.</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn primary" id="play">▶ Replay the run</button>
+          <button class="btn" id="skip">Skip to end</button>
+        </div>
+      </div>
+      <div class="lanes" id="lanes"></div>
+    </div>
+
+    <div class="section">
+      <h2>What the statistics found</h2>
+      <p class="sub" id="contrast-sub"></p>
+      <div class="verdicts" id="verdicts"></div>
+    </div>
+
+    <div class="section" id="reveal-section">
+      <h2>Reveal the hidden rule</h2>
+      <p class="sub">The engine never sees the rule. Validation compares its findings with the truth only after the analysis is done.</p>
+      <button class="btn" id="reveal-btn">🔒 Reveal</button>
+      <div class="reveal" id="reveal" hidden style="margin-top:12px"></div>
+    </div>
+
+    <div class="section">
+      <h2>All results</h2>
+      <div class="panel" style="overflow:auto"><table class="res" id="res-table"></table></div>
+    </div>
+
+    <div class="foot" id="foot">A test app we wrote, with a planted rule. Findings say "difference detected"; they cannot show intent,
+      and agents are not evidence about how people would behave.</div>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <header><div id="drawer-title"></div><button class="btn" id="drawer-close">Close</button></header>
+    <div class="body" id="drawer-body"></div>
+  </aside>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

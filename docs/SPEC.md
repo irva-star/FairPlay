@@ -354,61 +354,9 @@ address = "127.0.0.1"
 headless = true
 On the host, start it with FAIRPLAY_MODE=public streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port $PORT.
 P2 LLM summary. A "Draft plain-language summary" button sends only the results rows (metric, diff, CI, verdict) with fixed instructions to a small model. The output is labelled "AI draft, review before use" and it counts against the same budget guard.
-## 10. ContextGraph: the Entropy reconstruction
-A human reads CBC's reporting in their own browser and types each relationship into contextgraph/entropy_seed.yaml. Code only validates, analyses and draws that file. No fetcher, crawler or agent ever touches Entropy, an archive of it, or any extremist site.
-The point the graph makes: every donor-to-streamer money path ran through regulated financial nodes, and that is where the case actually broke. CBC reported that after the documentary aired in March, banking scrutiny led to the Georgian account being closed and the site announcing its shutdown (CBC News).
-Certainty labels (one per edge, drawn as a line style):
+## 10. ContextGraph **[Removed]**
+ContextGraph (the Entropy money-trail graph) was the example the idea came from, not part of the product. It was removed so the build stays on agents, personas and audits. The evidence store keeps its empty `nodes`/`edges` tables only to avoid a migration.
 
-| Value | Meaning | Line |
-|---|---|---|
-| journalism_finding | Journalists report it as their own finding | Solid |
-| self_reported_via_journalism | The company's own claim, as quoted by journalists | Dashed |
-| inferred | Analyst inference; requires a reasoning field | Dotted |
-| unknown | A question public data cannot answer; requires a question field | Grey, with "?" |
-
-This distinction matters. The $3 million transaction figure, for example, is the founders' own claim on LinkedIn as reported by CBC (syndicated copy), so it is self_reported_via_journalism, not a verified total.
-Seed file, starting draft. The curator confirms every claim against the article before filling reviewed_by; unreviewed edges render grey and say "draft".
-Source note: CBC's site blocked automated reading while this spec was written, so these drafts come from search excerpts and the case study. The order of the money path (processor, then Georgian account, then streamers) is a modelling choice. The excerpts confirm both accounts existed and that money was sent back to the Canadian account, not the exact flow.
-meta:
-  case: entropy-2026
-  rules: "Paraphrase only. No people, usernames or quotes of hateful content."
-sources:
-  cbc_shutdown:
-    url: https://www.cbc.ca/news/canada/entropy-live-shutting-down-fifth-estate-9.7201125
-    outlet: CBC News
-  cbc_investigation:
-    url: "<cbc.ca URL of the original fifth estate article, found by the curator>"
-    outlet: CBC News, the fifth estate
-nodes:
-  - {id: viewers, kind: AggregateRole, label: "Viewers and donors (aggregate)"}
-  - {id: entropy, kind: Platform, label: "Entropy livestreaming site"}
-  - {id: chthonic, kind: Company, label: "Chthonic Software (Alberta-registered)"}
-  - {id: processor_ca, kind: PaymentRail, label: "Canadian payment processing account", regulated: true}
-  - {id: account_ge, kind: Account, label: "Bank account in Georgia", regulated: true}
-  - {id: streamers, kind: AggregateRole, label: "Streamers (aggregate, unnamed)"}
-  - {id: doc_2026, kind: Investigation, label: "the fifth estate documentary, March 2026"}
-edges:
-  - {id: e1, src: viewers, dst: entropy, kind: money, certainty: journalism_finding, source: cbc_investigation,
-     claim: "Viewers paid donations and paid on-screen messages during streams.", reviewed_by: ""}
-  - {id: e2, src: entropy, dst: chthonic, kind: money, certainty: journalism_finding, source: cbc_investigation,
-     claim: "The company kept a 15 per cent cut of donations.", reviewed_by: ""}
-  - {id: e3, src: entropy, dst: processor_ca, kind: money, certainty: self_reported_via_journalism, source: cbc_shutdown,
-     claim: "Funds moved through a Canadian payment processing account.", reviewed_by: ""}
-  - {id: e4, src: processor_ca, dst: account_ge, kind: money, certainty: self_reported_via_journalism, source: cbc_shutdown,
-     claim: "Funds were also held in a Georgian account.", reviewed_by: ""}
-  - {id: e5, src: account_ge, dst: streamers, kind: money, certainty: journalism_finding, source: cbc_investigation,
-     claim: "Pooled donations were paid out to streamers.", reviewed_by: ""}
-  - {id: e6, src: chthonic, dst: entropy, kind: operates, certainty: journalism_finding, source: cbc_investigation,
-     claim: "Chthonic Software launched and runs the site.", reviewed_by: ""}
-  - {id: e7, src: doc_2026, dst: account_ge, kind: pressure, certainty: self_reported_via_journalism, source: cbc_shutdown,
-     claim: "After the documentary, the Georgian account was closed in a risk reassessment.", reviewed_by: ""}
-  - {id: u1, src: viewers, dst: streamers, kind: money, certainty: unknown,
-     question: "How much did each streamer actually receive?", reviewed_by: ""}
-  - {id: u2, src: processor_ca, dst: account_ge, kind: volume, certainty: unknown,
-     question: "What share of total volume passed through each account?", reviewed_by: ""}
-Validation (contextgraph/load.py, tested): node kinds limited to the S5 list; certainty in the enum; finding and self-reported edges need a known source; inferred needs reasoning; unknown needs question; labels at most 60 characters and claims at most 200.
-Analysis (contextgraph/analyze.py, networkx). Take the money edges (never the unknown ones), list every simple path from viewers to streamers, and intersect their nodes. Nodes on every path are chokepoints; those with regulated: true are labelled "actionable chokepoint". The unknown edges feed the "what public data cannot show" panel.
-CBC's articles name the co-founders. The graph still models only the company, per rule S5.
 ## 11. Repo layout and Claude Code build plan
 Export this doc as Markdown to docs/SPEC.md, add the two files below, then run one task per Claude Code session in table order. Person A owns the game, agents and hosting; Person B owns evidence, statistics, dashboard and ContextGraph.
 fairplay/

@@ -1,4 +1,4 @@
-# FairPlay Labs + ContextGraph
+# FairPlay Labs
 
 An engine that audits how an app *treats* different users. LLM agents play
 controlled personas through an app, every observation is stored as
@@ -12,9 +12,6 @@ Two apps to audit, both ours, both with a known hidden rule:
   treats renters worse. The live demo.
 - **Door Run** (`game/`): a 10-level door game with a planted switch. The
   calibration benchmark (A/A, permutation calibration, recovery of truth).
-
-Plus **ContextGraph** (`contextgraph/`): a hand-curated, sourced graph of the
-Entropy money trail.
 
 Full spec: `docs/SPEC.md` (StreamVault is section 16). Audit and open debt:
 `docs/TECH_DEBT.md`.
@@ -102,4 +99,3 @@ python -m validation.score_against_oracle <run_id>
 | `stats/` | Metrics, Welch CI, TOST, Holm, verdicts, power |
 | `validation/` | The only code that reads `oracle/`: scores results against truth |
 | `dashboard/` | Streamlit, local (approvals) and public (read-only snapshot) modes |
-| `contextgraph/` | Entropy evidence graph from a curated YAML file |
