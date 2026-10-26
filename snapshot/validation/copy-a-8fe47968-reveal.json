@@ -1,0 +1,32 @@
+{
+  "run_id": "copy-a-8fe47968",
+  "copy": "a",
+  "rule": "maze",
+  "engine_named": [
+    "none"
+  ],
+  "correct": false,
+  "rows": [
+    {
+      "metric": "S1",
+      "truth": 0.0,
+      "estimate": null,
+      "ci_low": null,
+      "ci_high": null
+    },
+    {
+      "metric": "S3",
+      "truth": 4.375,
+      "estimate": null,
+      "ci_low": null,
+      "ci_high": null
+    },
+    {
+      "metric": "S4",
+      "truth": -0.125,
+      "estimate": null,
+      "ci_low": null,
+      "ci_high": null
+    }
+  ]
+}
