@@ -36,21 +36,26 @@ def prereg_hash(app: str = "doorrun") -> str:
     return hashlib.sha256(PREREGS[app].read_bytes()).hexdigest()
 
 
-def _on_off(value) -> str:
-    if value is True or str(value).strip().lower() in ("on", "true"):
-        return "on"
-    return "off"
+RUN_SWITCHES = ("on", "off", "hidden")  # "hidden": StreamVault, whose rule the plan never names
+PREREG_BATCHES = ("on", "off", "any")   # "any": runs on every run of that app
 
 
 def contrasts_for(switch: str, prereg: dict) -> dict[str, dict]:
     """Only the contrasts whose batch matches this run's recorded switch.
 
     Chosen from the switch, never from the label: a label is free text, and
-    YAML 1.1 once turned the labels "on"/"off" into True/False.
+    YAML 1.1 once turned the labels "on"/"off" into True/False. Anything
+    unexpected is refused rather than guessed, so a typo can't silently pick
+    the wrong contrasts (audit C1).
     """
-    batch = _on_off(switch)
+    if switch not in RUN_SWITCHES:
+        raise ValueError(f"run switch must be one of {RUN_SWITCHES}, got {switch!r}")
+    for name, spec in prereg["contrasts"].items():
+        if spec["batch"] not in PREREG_BATCHES:
+            raise ValueError(f"prereg contrast {name}: batch must be quoted \"on\", \"off\" "
+                             f"or \"any\", got {spec['batch']!r}")
     return {name: spec for name, spec in prereg["contrasts"].items()
-            if str(spec["batch"]).lower() == "any" or _on_off(spec["batch"]) == batch}
+            if spec["batch"] in ("any", switch)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -121,7 +126,8 @@ def main(argv: list[str] | None = None) -> int:
 
             estimates = analyse_contrast(name, available, margins,
                                          bootstrap=not args.no_bootstrap, family=family)
-            print(f"\n{name}  ({a} − {b})")
+            # Plain ASCII: piped output on Windows is cp1252, which has no U+2212.
+            print(f"\n{name}  ({a} - {b})")
             for est in estimates:
                 ci = ("n/a" if est.ci_low is None
                       else f"[{est.ci_low:+.4f}, {est.ci_high:+.4f}]")

@@ -159,7 +159,11 @@ def build_plan(config_path: str | Path, *, concurrency: int | None = None) -> Pl
     app = get_app(app_name)
     # Door Run's condition is set by PLANTED_SWITCH. StreamVault's hidden judge
     # rule is deliberately NOT part of the plan: the audit must find it blind.
-    switch = on_off(config.get("switch", "off")) if app_name == "doorrun" else "hidden"
+    raw_switch = config.get("switch", "off")
+    if isinstance(raw_switch, bool):
+        # Refuse rather than guess (audit C1): the file should say what it means.
+        raise ValueError(f"{config_path}: switch loaded as a boolean; quote it, e.g. switch: \"on\"")
+    switch = on_off(raw_switch) if app_name == "doorrun" else "hidden"
 
     plan = Plan(
         label=str(label),
