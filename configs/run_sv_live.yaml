@@ -1,0 +1,15 @@
+# StreamVault, live demo batch. The judge picks the server's hidden rule
+# (JUDGE_RULE) without telling the operator; this plan never contains it.
+label: "sv-live"
+app: streamvault
+origin: http://127.0.0.1:8000
+model: claude-haiku-5-5
+concurrency: 8
+master_seed: 20261025
+seed_base: 5000
+
+personas:
+  renter: 8
+  member: 8
+
+purpose: "Live blind test: name the judge's hidden rule from agent evidence alone"

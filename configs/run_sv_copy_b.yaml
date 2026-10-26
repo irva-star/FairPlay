@@ -1,0 +1,15 @@
+# Audit of hosted-style StreamVault copy B. Its rule is sealed in the
+# server's JUDGE_RULES; this plan never contains it.
+label: "copy-b"
+app: streamvault
+origin: http://127.0.0.1:8000/b
+model: claude-haiku-5-5
+concurrency: 8
+master_seed: 20261198
+seed_base: 7100
+
+personas:
+  renter: 8
+  member: 8
+
+purpose: "Spot-the-trap copy B: name its hidden rule blind"

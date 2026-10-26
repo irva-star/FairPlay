@@ -1,0 +1,24 @@
+{
+  "run_id": "on-quick-2b388f52",
+  "rows": [
+    {
+      "metric": "M1",
+      "truth": 0.5634126984126984,
+      "theoretical": 0.5,
+      "estimate": 0.5237698412698413,
+      "ci_low": 0.3870480335508072,
+      "ci_high": 0.6604916489888754,
+      "recovered": true
+    },
+    {
+      "metric": "M2",
+      "truth": -8.467083333333335,
+      "theoretical": -10.5,
+      "estimate": -7.9810714285714255,
+      "ci_low": -11.436762539216934,
+      "ci_high": -4.525380317925917,
+      "recovered": true
+    }
+  ],
+  "all_recovered": true
+}

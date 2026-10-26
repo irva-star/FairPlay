@@ -5,6 +5,16 @@ Method: read every module against `docs/SPEC.md`, ran the full test suite, and
 reproduced each finding below with a script or a test. Nothing in the code was
 changed; fixes wait for your pick (see "Fix batches" at the end).
 
+## Status update (Oct 25, 11:00)
+
+Fixed in the StreamVault change set, each with a regression test (394 tests pass):
+C1 YAML booleans, C2 offer after level 9, C3 retries merging attempts, M4 duplicate
+results, M5 lenient screen parsing, L6 zero-variance verdict, both test bugs, and
+the unpinned Streamlit from H4 (it broke against FastAPI's Starlette pin). A
+correction: this report first said "52 pass"; the real count was 349 pass, 4 fail.
+Still open: H1, H2, H3, H5 (Door Run only; StreamVault scopes its oracle by
+seed), H6, M1–M3, M6–M10, L1–L5, and all structural debt.
+
 ## Summary
 
 The code is well structured and the safety design (S1–S15) is implemented with
@@ -15,7 +25,7 @@ exists yet.
 
 | | Status |
 |---|---|
-| Tests | 52 pass, **4 fail** (2 code bugs, 2 test bugs) |
+| Tests | 349 pass, **4 fail** (2 code bugs, 2 test bugs) |
 | Results pipeline | **Broken**: `python -m stats` computes no contrasts for any run (C1) |
 | Game data | **Biased**: ~15% of sessions end after 9 levels, more often for spenders (C2) |
 | Retried sessions | **Contaminated**: both attempts' events merge into one session (C3) |

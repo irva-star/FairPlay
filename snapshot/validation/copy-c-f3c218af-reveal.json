@@ -1,0 +1,32 @@
+{
+  "run_id": "copy-c-f3c218af",
+  "copy": "c",
+  "rule": "maze",
+  "engine_named": [
+    "maze"
+  ],
+  "correct": true,
+  "rows": [
+    {
+      "metric": "S1",
+      "truth": 12.5,
+      "estimate": 12.5,
+      "ci_low": -32.9638371413322,
+      "ci_high": 57.9638371413322
+    },
+    {
+      "metric": "S3",
+      "truth": 4.0,
+      "estimate": 4.75,
+      "ci_low": 3.0246743779595984,
+      "ci_high": 6.475325622040401
+    },
+    {
+      "metric": "S4",
+      "truth": 0.0,
+      "estimate": 0.0,
+      "ci_low": -0.6506324855189937,
+      "ci_high": 0.6506324855189937
+    }
+  ]
+}

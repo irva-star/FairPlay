@@ -18,7 +18,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 
-APP_FOLDERS = ("game", "walker", "evidence", "stats", "validation", "contextgraph", "dashboard")
+APP_FOLDERS = ("game", "streamvault", "walker", "evidence", "stats", "validation", "contextgraph", "dashboard")
 
 BANNED_MODULES = {
     "requests", "httpx", "aiohttp", "urllib.request", "urllib3", "socket",

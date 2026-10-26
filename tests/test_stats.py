@@ -142,14 +142,26 @@ def test_the_bootstrap_is_reproducible(samples) -> None:
 
 # --- degenerate input ---------------------------------------------------------
 
-def test_zero_variance_is_inconclusive_not_nan() -> None:
+def test_identical_constants_are_equivalent_not_nan() -> None:
+    # Every session in both groups scored the same: the difference is exactly 0,
+    # which is inside any margin. No p-value is invented and no NaN leaks out.
     a = [0.5] * 30
     b = [0.5] * 30
     est = estimate("M1", "V3_aa", a, b, margin=0.1, bootstrap=False)
-    assert est.verdict == V.INCONCLUSIVE
+    assert est.verdict == V.EQUIVALENT
     assert est.p_raw is None
     assert est.tost_p is None
+    assert est.ci_low == est.ci_high == 0.0
+    assert "identical" in est.note
+
+
+def test_different_constants_are_judged_against_the_margin() -> None:
+    est = estimate("S1", "SV_audit", [549.0] * 8, [249.0] * 8, margin=50, bootstrap=False)
+    assert est.verdict == V.DIFFERENCE_DETECTED
+    assert est.diff == 300.0
     assert "zero variance" in est.note
+    small = estimate("S1", "SV_audit", [260.0] * 8, [249.0] * 8, margin=50, bootstrap=False)
+    assert small.verdict == V.BELOW_MARGIN
 
 
 def test_too_few_observations_is_inconclusive() -> None:

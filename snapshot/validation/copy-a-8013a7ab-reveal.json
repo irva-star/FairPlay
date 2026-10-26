@@ -1,0 +1,32 @@
+{
+  "run_id": "copy-a-8013a7ab",
+  "copy": "a",
+  "rule": "preticked",
+  "engine_named": [
+    "preticked"
+  ],
+  "correct": true,
+  "rows": [
+    {
+      "metric": "S1",
+      "truth": 0.0,
+      "estimate": 0.0,
+      "ci_low": -47.52875506663341,
+      "ci_high": 47.52875506663341
+    },
+    {
+      "metric": "S3",
+      "truth": 0.375,
+      "estimate": 0.375,
+      "ci_low": -0.46214535634807974,
+      "ci_high": 1.2121453563480797
+    },
+    {
+      "metric": "S4",
+      "truth": 1.5,
+      "estimate": 1.5,
+      "ci_low": 0.8511438077414065,
+      "ci_high": 2.1488561922585934
+    }
+  ]
+}

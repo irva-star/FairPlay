@@ -15,33 +15,42 @@ import sys
 from pathlib import Path
 
 from evidence.store import DEFAULT_DB, EvidenceStore
-from stats import metrics as M
-from stats.analysis import analyse_contrast
+from stats import metrics as doorrun_metrics
+from stats import sv_metrics
+from stats.analysis import HOLM_FAMILY, analyse_contrast
 from stats.power import format_power_table, power_table
 
 PREREG = Path("prereg.yaml")
+PREREGS = {"doorrun": Path("prereg.yaml"), "streamvault": Path("prereg_streamvault.yaml")}
+METRICS = {"doorrun": doorrun_metrics, "streamvault": sv_metrics}
+FAMILIES = {"doorrun": HOLM_FAMILY, "streamvault": sv_metrics.HOLM_FAMILY}
 
 
-def load_prereg() -> dict:
+def load_prereg(app: str = "doorrun") -> dict:
     import yaml
 
-    return yaml.safe_load(PREREG.read_text(encoding="utf-8"))
+    return yaml.safe_load(PREREGS[app].read_text(encoding="utf-8"))
 
 
-def prereg_hash() -> str:
-    return hashlib.sha256(PREREG.read_bytes()).hexdigest()
+def prereg_hash(app: str = "doorrun") -> str:
+    return hashlib.sha256(PREREGS[app].read_bytes()).hexdigest()
+
+
+def _on_off(value) -> str:
+    if value is True or str(value).strip().lower() in ("on", "true"):
+        return "on"
+    return "off"
 
 
 def contrasts_for(switch: str, prereg: dict) -> dict[str, dict]:
-    """Only the contrasts whose batch matches the switch the run was recorded with."""
-    if switch not in ("on", "off"):
-        raise ValueError(f"run switch must be 'on' or 'off', got {switch!r}")
-    for name, spec in prereg["contrasts"].items():
-        if spec["batch"] not in ("on", "off"):
-            raise ValueError(f"prereg contrast {name}: batch must be quoted \"on\" or \"off\", "
-                             f"got {spec['batch']!r}")
+    """Only the contrasts whose batch matches this run's recorded switch.
+
+    Chosen from the switch, never from the label: a label is free text, and
+    YAML 1.1 once turned the labels "on"/"off" into True/False.
+    """
+    batch = _on_off(switch)
     return {name: spec for name, spec in prereg["contrasts"].items()
-            if spec["batch"] == switch}
+            if str(spec["batch"]).lower() == "any" or _on_off(spec["batch"]) == batch}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -55,20 +64,19 @@ def main(argv: list[str] | None = None) -> int:
                     help="sensitivity analysis: drop protocol-deviation sessions")
     args = ap.parse_args(argv)
 
-    prereg = load_prereg()
-    margins = {k: float(v["margin"]) for k, v in prereg["metrics"].items()}
-
     with EvidenceStore(args.db) as store:
-        run = store.conn.execute("SELECT label, switch FROM runs WHERE run_id=?",
+        run = store.conn.execute("SELECT label, switch, app FROM runs WHERE run_id=?",
                                  (args.run_id,)).fetchone()
         if run is None:
             print(f"no such run: {args.run_id}", file=sys.stderr)
             return 1
-        label, switch = run["label"], run["switch"]
-        if switch is None:
-            print(f"run {args.run_id} has no recorded switch (made before it was stored); "
-                  "re-run the batch", file=sys.stderr)
-            return 1
+        label = run["label"]
+        app = run["app"] or "doorrun"
+        M, family = METRICS[app], FAMILIES[app]
+        prereg = load_prereg(app)
+        margins = {k: float(v["margin"]) for k, v in prereg["metrics"].items()}
+        # Older runs have no switch column value; their label is the best we have.
+        switch = run["switch"] or ("on" if str(label).lower() in ("on", "pilot", "true") else "off")
 
         rows = M.run_metrics(store.conn, args.run_id)
         if not rows:
@@ -77,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         M.persist(store, rows)
 
         missing = M.missing_counts(rows)
-        print(f"run {args.run_id} ({label}, switch {switch}): {len(rows)} sessions")
+        print(f"run {args.run_id} ({label}): {len(rows)} sessions")
         print("  sessions missing each metric: "
               + ", ".join(f"{k} {v}" for k, v in missing.items()))
         noncompliant = [r.session_id for r in rows if not r.compliant]
@@ -88,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         import statistics
 
         sigmas = {}
-        for metric in ("M1", "M2", "M3", "M4"):
+        for metric in family:
             values = [r.value(metric) for r in rows if r.value(metric) is not None]
             if len(values) > 1:
                 sigmas[metric] = statistics.pstdev(values)
@@ -96,8 +104,8 @@ def main(argv: list[str] | None = None) -> int:
             print("\n" + format_power_table(power_table(
                 sigmas, margins, n_planned=int(prereg["sessions_per_persona"]))))
 
-        payload: dict = {"run_id": args.run_id, "label": label, "switch": switch,
-                         "prereg_hash": prereg_hash(), "contrasts": {}}
+        payload: dict = {"run_id": args.run_id, "label": label, "app": app,
+                         "prereg_hash": prereg_hash(app), "contrasts": {}}
 
         for name, spec in contrasts_for(switch, prereg).items():
             a, b = spec["a"], spec["b"]
@@ -112,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
 
             estimates = analyse_contrast(name, available, margins,
-                                         bootstrap=not args.no_bootstrap)
+                                         bootstrap=not args.no_bootstrap, family=family)
             print(f"\n{name}  ({a} − {b})")
             for est in estimates:
                 ci = ("n/a" if est.ci_low is None
@@ -125,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
                     "diff": est.diff, "ci_low": est.ci_low, "ci_high": est.ci_high,
                     "hedges_g": est.hedges_g, "p_raw": est.p_raw, "p_holm": est.p_holm,
                     "tost_p": est.tost_p, "margin": est.margin, "verdict": est.verdict,
-                    "prereg_hash": prereg_hash(),
+                    "prereg_hash": prereg_hash(app),
                 })
             payload["contrasts"][name] = [est.as_row() for est in estimates]
 

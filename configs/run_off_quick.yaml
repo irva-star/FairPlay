@@ -1,0 +1,14 @@
+label: "off-quick"
+origin: http://127.0.0.1:8000
+switch: "off"
+model: claude-haiku-5-5
+concurrency: 4
+master_seed: 20261025
+
+seed_base: 9000
+
+personas:
+  spender: 20
+  free: 20
+
+purpose: "V2 specificity: with the rule off, nothing should be detected"

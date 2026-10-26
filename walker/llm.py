@@ -56,13 +56,16 @@ def _first_tool_use(content) -> Any | None:
 class AnthropicWalker:
     """Wraps the SDK. The rate limiter, not this class, decides when to send."""
 
-    def __init__(self, limiter, *, model: str = MODEL, api_key: str | None = None) -> None:
+    def __init__(self, limiter, *, model: str = MODEL, api_key: str | None = None,
+                 tools: list[dict] | None = None) -> None:
         from anthropic import AsyncAnthropic
 
         # max_retries handles rate-limit and server errors with backoff.
         self._client = AsyncAnthropic(max_retries=3, **({"api_key": api_key} if api_key else {}))
         self._limiter = limiter
         self.model = model
+        # The fixed tool list of the app being audited (rule S3). Door Run's by default.
+        self.tools = tools if tools is not None else TOOLS
 
     async def decide(self, system_prompt: str, observation: dict) -> Decision:
         from anthropic import APIStatusError, RateLimitError
@@ -80,7 +83,7 @@ class AnthropicWalker:
                     "text": system_prompt,
                     "cache_control": {"type": "ephemeral"},
                 }],
-                tools=TOOLS,
+                tools=self.tools,
                 tool_choice={"type": "any", "disable_parallel_tool_use": True},
                 messages=[{"role": "user", "content": payload}],
             )
@@ -116,10 +119,20 @@ class AnthropicWalker:
 class FakeLLM:
     """Zero-cost stub for development (`--llm fake`). Never used for a measured run."""
 
-    def __init__(self, seed: int = 0) -> None:
+    def __init__(self, seed: int = 0, policy=None) -> None:
         self._rng = random.Random(seed)
+        # Optional app-specific scripted policy: (system_prompt, observation, rng)
+        # -> (tool, args). Door Run uses the random policy below.
+        self._policy = policy
 
     async def decide(self, system_prompt: str, observation: dict) -> Decision:
+        if self._policy is not None:
+            tool, args = self._policy(system_prompt, observation, self._rng)
+            if tool is None:
+                return Decision(tool=None, invalid_reason="no_tool_use", stop_reason="end_turn",
+                                model="fake", latency_ms=0)
+            return Decision(tool=tool, args={"reason": "fake stub", **args}, usage=Usage(),
+                            stop_reason="tool_use", model="fake", latency_ms=0)
         allowed = list(observation.get("allowed_actions") or [])
         if not allowed:
             return Decision(tool=None, invalid_reason="no_tool_use", stop_reason="end_turn",

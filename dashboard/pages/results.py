@@ -1,4 +1,4 @@
-"""Results page: verdict cards, forest plots for V1-V3, and the results table."""
+"""Results page: headline numbers, verdict cards, forest plots and the results table."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from dashboard.common import (
-    CANNOT_SHOW, CONTRAST_LABELS, METRIC_LABELS, VERDICT_ICON,
+    IS_PUBLIC, CANNOT_SHOW, CONTRAST_LABELS, METRIC_LABELS, SV_PERSONA_LABELS, VERDICT_ICON,
     page_header, prereg_hash, query, results_for, run_picker, total_spend,
 )
 
@@ -21,6 +21,47 @@ page_header("Results", "Each metric with its 95% confidence interval and the mar
 run_id = run_picker()
 if not run_id:
     st.stop()
+
+run_row = query("SELECT app FROM runs WHERE run_id=?", (run_id,))
+app = (run_row[0]["app"] if run_row else None) or "doorrun"
+
+if app == "streamvault":
+    # The numbers anyone understands, before any statistics: what each kind of
+    # member was actually charged, and how hard it was to leave.
+    st.subheader("What members actually experienced")
+    avg = {(r["persona"], r["metric"]): r["v"] for r in query(
+        "SELECT s.persona, m.metric, AVG(m.value) AS v FROM metrics m "
+        "JOIN sessions s ON s.session_id = m.session_id WHERE s.run_id=? "
+        "GROUP BY s.persona, m.metric", (run_id,))}
+    personas = [p for p in ("renter", "member", "member_twin") if (p, "S2") in avg]
+    for persona in personas:
+        paid = 499 + avg[(persona, "S2")]
+        cols = st.columns(4)
+        cols[0].markdown(f"**{SV_PERSONA_LABELS.get(persona, persona)}**")
+        cols[1].metric("Advertised → charged", f"$4.99 → ${paid / 100:.2f}",
+                       delta=f"+{(paid - 499) / 499:.0%} above advertised", delta_color="inverse")
+        if (persona, "S3") in avg:
+            cols[2].metric("Clicks to cancel", f"{avg[(persona, 'S3')]:.1f}",
+                           help="Clicks on 'Continue to cancel'. Joining took 3.")
+        if (persona, "S4") in avg:
+            cols[3].metric("Add-ons pre-ticked", f"{avg[(persona, 'S4')]:.1f}")
+    if not personas:
+        st.caption("Run `python -m stats <run_id>` to compute the per-session numbers.")
+
+    import json
+    from pathlib import Path
+
+    reveal_path = Path("snapshot/validation" if IS_PUBLIC else "data/validation") / f"{run_id}-reveal.json"
+    if reveal_path.exists():
+        reveal = json.loads(reveal_path.read_text(encoding="utf-8"))
+        with st.expander("Reveal the hidden rule (opens the sealed answer key)"):
+            named = ", ".join(reveal["engine_named"])
+            st.markdown(f"**Hidden rule:** `{reveal['rule']}` · **Engine named:** `{named}` · "
+                        + ("**correct**" if reveal["correct"] else "**missed**"))
+            st.dataframe(reveal["rows"], hide_index=True, use_container_width=True)
+            st.caption("True difference computed from the server's sealed log for this run's "
+                       "sessions only, next to the engine's estimate and 95% CI.")
+    st.divider()
 
 rows = results_for(run_id)
 if not rows:
@@ -43,7 +84,11 @@ c1.metric("Sessions", total)
 c2.metric("Completed", ok, delta=f"{total - ok} attrition" if total != ok else None,
           delta_color="inverse")
 c3.metric("API spend", f"${total_spend(run_id):.4f}")
-st.caption(f"Pre-registration hash `{prereg_hash()}` · analysis plan committed before the runs.")
+if total_spend(run_id) == 0:
+    # Say so plainly: a $0 run means the scripted stand-in played, not Claude.
+    st.warning("This run used the free scripted stand-in agent, not Claude. It tests the "
+               "engine end to end; a run with the real model is labelled with its spend.")
+st.caption(f"Pre-registration hash `{prereg_hash(app)}` · analysis plan committed before the runs.")
 
 
 def forest(contrast_rows: list) -> go.Figure:
@@ -84,13 +129,13 @@ def forest(contrast_rows: list) -> go.Figure:
             row=i, col=1,
         )
         fig.update_yaxes(visible=False, range=[-0.5, 0.5], row=i, col=1)
-        fig.update_xaxes(title_text="difference (A − free), raw units", row=i, col=1)
+        fig.update_xaxes(title_text="difference (A − B), raw units", row=i, col=1)
 
     fig.update_layout(height=190 * len(metrics), margin=dict(l=10, r=10, t=40, b=10))
     return fig
 
 
-for contrast in ("V1_sensitivity", "V2_specificity", "V3_aa"):
+for contrast in ("V1_sensitivity", "V2_specificity", "V3_aa", "SV_audit", "SV_aa"):
     contrast_rows = by_contrast.get(contrast)
     if not contrast_rows:
         continue

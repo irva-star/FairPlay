@@ -1,0 +1,17 @@
+label: "on-quick"
+origin: http://127.0.0.1:8000
+switch: "on"
+model: claude-haiku-5-5
+concurrency: 4
+master_seed: 20261024
+
+seed_base: 8000
+
+# free_twin runs inside the ON batch, so the A/A comparison shares the server,
+# the model and the hour with free (SPEC section 6).
+personas:
+  spender: 20
+  free: 20
+  free_twin: 20
+
+purpose: "V1 sensitivity, V3 A/A, V5 recovery"

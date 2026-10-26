@@ -1,0 +1,32 @@
+{
+  "run_id": "copy-b-1d8904a9",
+  "copy": "b",
+  "rule": "fee",
+  "engine_named": [
+    "fee"
+  ],
+  "correct": true,
+  "rows": [
+    {
+      "metric": "S1",
+      "truth": 312.5,
+      "estimate": 312.5,
+      "ci_low": 270.24114960432996,
+      "ci_high": 354.75885039567004
+    },
+    {
+      "metric": "S3",
+      "truth": -0.375,
+      "estimate": -0.25,
+      "ci_low": -0.9451477575485361,
+      "ci_high": 0.4451477575485361
+    },
+    {
+      "metric": "S4",
+      "truth": -0.625,
+      "estimate": -0.625,
+      "ci_low": -1.245380221252192,
+      "ci_high": -0.0046197787478080565
+    }
+  ]
+}

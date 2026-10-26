@@ -23,7 +23,6 @@ class FakeGame:
         self.owned: set[str] = set()
         self.last_result = R.RESULT_NONE
         self.offer_price: int | None = None
-        self.levels_resolved = 0
         self.done = False
         self.seq = 0
         self.oracle: list[dict] = []
@@ -55,7 +54,7 @@ class FakeGame:
                 self.owned.add(R.STORE_ITEM_ID)
         elif test_id == "offer-dismiss":
             self.offer_price = None
-            if self.levels_resolved >= R.LEVELS_TOTAL:
+            if self.level_no >= R.LEVELS_TOTAL:
                 self.done = True
                 self.screen = "done"
             else:
@@ -84,7 +83,6 @@ class FakeGame:
 
         self.last_result = R.RESULT_WIN if won else R.RESULT_LOSS
         self.offer_price = offer
-        self.levels_resolved = level
         if level >= R.LEVELS_TOTAL:
             self.level_no = level
             self.done = offer is None

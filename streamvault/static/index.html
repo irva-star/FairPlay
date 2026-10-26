@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamVault — Unlimited Originals &amp; Cinema (test app)</title>
+  <style>
+    :root {
+      --bg-deep: #07080d;
+      --bg-surface: #11131f;
+      --bg-card: #171a2b;
+      --bg-card-hover: #1e2238;
+      --border-subtle: rgba(255, 255, 255, 0.09);
+      --border-highlight: rgba(229, 9, 20, 0.55);
+      --brand-primary: #e50914;
+      --brand-secondary: #ff4b2b;
+      --accent-gold: #f59e0b;
+      --accent-emerald: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-deep);
+      background-image:
+        radial-gradient(circle at 15% 10%, rgba(229, 9, 20, 0.14), transparent 40%),
+        radial-gradient(circle at 85% 20%, rgba(99, 102, 241, 0.12), transparent 45%);
+      color: var(--text-main);
+      min-height: 100vh;
+      line-height: 1.5;
+      padding-bottom: 84px;
+      overflow-x: hidden;
+    }
+
+    /* ==========================================================================
+       STRICT SCREEN VISIBILITY & ENTRANCE ANIMATION (< 450ms)
+       ========================================================================== */
+    .screen {
+      display: none;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 18px 48px;
+      animation: screenSlideIn 360ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    #app[data-state="landing"] section[data-screen="landing"],
+    #app[data-state="plans"] section[data-screen="plans"],
+    #app[data-state="addons"] section[data-screen="addons"],
+    #app[data-state="checkout"] section[data-screen="checkout"],
+    #app[data-state="welcome"] section[data-screen="welcome"],
+    #app[data-state="account"] section[data-screen="account"],
+    #app[data-state="cancel"] section[data-screen="cancel"],
+    #app[data-state="cancelled"] section[data-screen="cancelled"] {
+      display: block;
+    }
+
+    @keyframes screenSlideIn {
+      0% {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Decorative pulse that does NOT move layout or hide testids */
+    @keyframes retainGlow {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(229, 9, 20, 0.55), 0 10px 28px -4px rgba(229, 9, 20, 0.5);
+      }
+      50% {
+        box-shadow: 0 0 0 7px rgba(229, 9, 20, 0), 0 12px 34px 0 rgba(255, 75, 43, 0.65);
+      }
+    }
+
+    @keyframes confettiFloat {
+      0% {
+        opacity: 0;
+        transform: translateY(-12px) rotate(0deg);
+      }
+      40% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0.85;
+        transform: translateY(4px) rotate(18deg);
+      }
+    }
+
+    /* ==========================================================================
+       TOP BRAND HEADER & PREVIEW BAR
+       ========================================================================== */
+    .site-header {
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(7, 8, 13, 0.86);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .header-inner {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-main);
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(229, 9, 20, 0.4);
+    }
+
+    .preview-switcher {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .preview-pill {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      padding: 4px 9px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .preview-pill:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .state-readout {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: #0d101b;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    /* ==========================================================================
+       SHARED UI COMPONENTS
+       ========================================================================== */
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      background: rgba(229, 9, 20, 0.16);
+      color: #fca5a5;
+      border: 1px solid rgba(229, 9, 20, 0.35);
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 26px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 8px 24px -4px rgba(229, 9, 20, 0.45);
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-main);
+      font-weight: 600;
+      font-size: 0.92rem;
+      padding: 12px 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .section-title {
+      font-size: clamp(1.6rem, 3.5vw, 2.35rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 8px;
+    }
+
+    .section-subtitle {
+      color: var(--text-muted);
+      font-size: 0.98rem;
+      margin-bottom: 24px;
+    }
+
+    /* ==========================================================================
+       SCREEN 1: LANDING
+       ========================================================================== */
+    .hero-card {
+      background: linear-gradient(165deg, rgba(25, 28, 48, 0.95), rgba(12, 14, 24, 0.98));
+      border: 1px solid var(--border-subtle);
+      border-radius: 22px;
+      padding: 32px 24px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.7);
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    @media (min-width: 768px) {
+      .hero-grid {
+        grid-template-columns: 1.15fr 0.85fr;
+      }
+      .hero-card {
+        padding: 42px 36px;
+      }
+    }
+
+    .headline-price-tag {
+      display: inline-block;
+      margin: 14px 0 6px;
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      padding: 6px 14px;
+      border-radius: 10px;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-top: 22px;
+    }
+
+    /* Poster Art Grid */
+    .poster-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .poster-tile {
+      border-radius: 14px;
+      padding: 16px 14px;
+      min-height: 136px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      overflow: hidden;
+    }
+
+    .poster-tile.night-harbor {
+      background:
+        radial-gradient(circle at 75% 20%, rgba(56, 189, 248, 0.45), transparent 55%),
+        linear-gradient(160deg, #09192f 0%, #0f172a 60%, #020617 100%);
+    }
+
+    .poster-tile.solaris-drift {
+      background:
+        radial-gradient(circle at 80% 25%, rgba(249, 115, 22, 0.5), transparent 55%),
+        linear-gradient(160deg, #3b0a26 0%, #1e1b4b 70%, #090d16 100%);
+    }
+
+    .poster-tile.velvet-protocol {
+      background:
+        radial-gradient(circle at 25% 25%, rgba(236, 72, 153, 0.45), transparent 55%),
+        linear-gradient(160deg, #2e1065 0%, #111827 75%, #030712 100%);
+    }
+
+    .poster-tile.ash-crown {
+      background:
+        radial-gradient(circle at 70% 20%, rgba(16, 185, 129, 0.4), transparent 55%),
+        linear-gradient(160deg, #064e3b 0%, #0f172a 75%, #020617 100%);
+    }
+
+    .poster-tag {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: rgba(0, 0, 0, 0.55);
+      color: #e2e8f0;
+    }
+
+    .poster-title {
+      font-weight: 800;
+      font-size: 0.96rem;
+      letter-spacing: -0.01em;
+      color: #fff;
+    }
+
+    .poster-meta {
+      font-size: 0.72rem;
+      color: #cbd5e1;
+      opacity: 0.85;
+    }
+
+    /* One-off Movie Rental Box */
+    .rental-banner {
+      margin-top: 20px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      border-radius: 16px;
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .rental-status-pill {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent-emerald);
+      min-height: 22px;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    /* ==========================================================================
+       SCREEN 2: PLANS (3 CARDS SIDE BY SIDE ON DESKTOP, STACK ON MOBILE)
+       ========================================================================== */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    @media (min-width: 768px) {
+      .plans-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .plan-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .plan-card.popular {
+      border: 2px solid var(--brand-primary);
+      background: linear-gradient(180deg, rgba(229, 9, 20, 0.10) 0%, var(--bg-card) 38%);
+      box-shadow: 0 16px 36px -10px rgba(229, 9, 20, 0.28);
+    }
+
+    .popular-ribbon {
+      position: absolute;
+      top: -12px;
+      right: 18px;
+      background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .plan-name {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .plan-price-display {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.03em;
+      margin: 12px 0 4px;
+    }
+
+    .plan-features {
+      list-style: none;
+      margin: 16px 0 24px;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .plan-features li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ==========================================================================
+       SCREEN 3: ADD-ONS ("MAKE IT EVEN BETTER" UPSELL PAGE)
+       ========================================================================== */
+    .addons-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .addon-row {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      cursor: pointer;
+    }
+
+    .addon-row:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .addon-left {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .addon-checkbox {
+      width: 22px;
+      height: 22px;
+      margin-top: 2px;
+      accent-color: var(--brand-primary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .addon-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #fff;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .addon-desc {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .addon-price-tag {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #fbbf24;
+      white-space: nowrap;
+    }
+
+    .urgency-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: rgba(245, 158, 11, 0.16);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* ==========================================================================
+       SCREEN 4: CHECKOUT (ORDER SUMMARY + DRIP FEE + LOW-CONTRAST FINE PRINT)
+       ========================================================================== */
+    .checkout-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 26px 22px;
+      max-width: 580px;
+      margin: 0 auto;
+    }
+
+    .summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.96rem;
+    }
+
+    .summary-row.fee-row {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    .summary-row.total-row {
+      border-bottom: none;
+      padding-top: 18px;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    /* Deliberate dark pattern: low-contrast, tiny fine print for auto-renewal */
+    .autorenew-darkpattern {
+      margin: 16px 0 20px;
+      font-size: 0.68rem;
+      line-height: 1.35;
+      color: #475263;
+      background: rgba(9, 11, 19, 0.6);
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    /* ==========================================================================
+       SCREEN 5: WELCOME (CELEBRATION + CONFETTI)
+       ========================================================================== */
+    .welcome-card {
+      background: linear-gradient(165deg, #161b30, #0e111d);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 22px;
+      padding: 38px 24px;
+      text-align: center;
+      max-width: 620px;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .confetti-strip {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 14px;
+      font-size: 1.35rem;
+      animation: confettiFloat 520ms ease-out forwards;
+    }
+
+    /* ==========================================================================
+       SCREEN 6: ACCOUNT SETTINGS (DE-EMPHASISED CANCEL BUTTON AT BOTTOM)
+       ========================================================================== */
+    .account-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 18px;
+      padding: 24px 20px;
+      margin-bottom: 16px;
+    }
+
+    .account-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.92rem;
+    }
+
+    .account-row:last-child {
+      border-bottom: none;
+    }
+
+    .buried-cancel-zone {
+      margin-top: 36px;
+      padding-top: 16px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn-deemphasised-text {
+      background: transparent;
+      border: none;
+      color: #525e73;
+      font-size: 0.76rem;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 6px 8px;
+    }
+
+    .btn-deemphasised-text:hover {
+      color: var(--text-muted);
+    }
+
+    /* ==========================================================================
+       SCREEN 7: CANCELLATION MAZE (ROACH MOTEL ASYMMETRY)
+       ========================================================================== */
+    .cancel-maze-card {
+      background: linear-gradient(180deg, rgba(69, 10, 10, 0.32) 0%, var(--bg-card) 48%);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 20px;
+      padding: 30px 24px;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .btn-keep-pulsing {
+      width: 100%;
+      padding: 17px 24px;
+      font-size: 1.12rem;
+      font-weight: 800;
+      border-radius: 14px;
+      border: none;
+      color: #fff;
+      background: linear-gradient(135deg, #e50914, #ff512f);
+      cursor: pointer;
+      animation: retainGlow 2.2s infinite ease-in-out;
+      margin-bottom: 14px;
+    }
+
+    .btn-continue-cancel-tiny {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #64748b;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .btn-continue-cancel-tiny:hover {
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* ==========================================================================
+       FIXED AUDIT FOOTER BADGE (VISIBLE ON EVERY SCREEN)
+       ========================================================================== */
+    .audit-footer-badge {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      background: rgba(11, 15, 25, 0.94);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fcd34d;
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 6px 16px;
+      border-radius: 999px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.65);
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation & Preview Screen Switcher -->
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand-logo">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+            <path d="M5 3l14 9-14 9V3z"/>
+          </svg>
+        </span>
+        <span>StreamVault</span>
+      </div>
+
+      <div class="state-readout">
+        state: <strong id="debug-state">landing</strong> · seq: <strong id="debug-seq">0</strong>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       ROOT APPLICATION CONTAINER (#app[data-state][data-seq])
+       ======================================================================== -->
+  <main id="app" data-state="landing" data-seq="0">
+
+    <!-- ======================================================================
+         SCREEN 1: "landing"
+         ====================================================================== -->
+    <section class="screen" data-screen="landing">
+      <div class="hero-card">
+        <div class="hero-grid">
+          <div>
+            <span class="badge-pill">⚡ StreamVault Originals · 4K HDR</span>
+            <h1 class="section-title" style="margin-top: 14px;">
+              Cinema-grade stories. Zero hidden limits.
+            </h1>
+            <p class="section-subtitle" style="margin-bottom: 8px;">
+              Stream exclusive thrillers, sci-fi series, and live premieres on any screen.
+            </p>
+
+            <!-- Required: data-testid="headline-price" data-value="499" -->
+            <div data-testid="headline-price" data-value="499" class="headline-price-tag">
+              From $4.99/month
+            </div>
+
+            <div class="hero-cta-row">
+              <!-- Required: data-testid="start-signup" -->
+              <button type="button" data-testid="start-signup" class="btn-primary">
+                Start watching →
+              </button>
+            </div>
+          </div>
+
+          <!-- Original CSS Poster Tiles -->
+          <div class="poster-grid" aria-hidden="true">
+            <div class="poster-tile night-harbor">
+              <span class="poster-tag">Top #1 Tonight</span>
+              <div class="poster-title">Night Harbor</div>
+              <div class="poster-meta">Noir Thriller · 4K Dolby</div>
+            </div>
+            <div class="poster-tile solaris-drift">
+              <span class="poster-tag">New Season</span>
+              <div class="poster-title">Solaris Drift</div>
+              <div class="poster-meta">Sci-Fi Odyssey · S2</div>
+            </div>
+            <div class="poster-tile velvet-protocol">
+              <span class="poster-tag">Original Film</span>
+              <div class="poster-title">Velvet Protocol</div>
+              <div class="poster-meta">Espionage · 2h 18m</div>
+            </div>
+            <div class="poster-tile ash-crown">
+              <span class="poster-tag">Critics' Pick</span>
+              <div class="poster-title">Ash &amp; Crown</div>
+              <div class="poster-meta">Historical Drama · HDR</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- One-Off Instant Rental Box -->
+        <div class="rental-banner">
+          <div>
+            <div style="font-weight: 700; font-size: 0.96rem; color: #fff;">
+              Just here for tonight's premiere?
+            </div>
+            <div style="font-size: 0.84rem; color: var(--text-muted);">
+              48-hour instant stream access for
+              <!-- Required: data-testid="rent-price" data-value="399" -->
+              <span data-testid="rent-price" data-value="399" style="color: #38bdf8; font-weight: 700;">$3.99</span>
+              — no subscription required.
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <!-- Required: data-testid="rent-movie" -->
+            <button type="button" data-testid="rent-movie" class="btn-secondary">
+              Rent 'Night Harbor' — $3.99
+            </button>
+            <!-- Required: data-testid="rental-status" -->
+            <span data-testid="rental-status" id="rental-status-box" class="rental-status-pill"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SCREEN 2: "plans"
+         ====================================================================== -->
+    <section class="screen" data-screen="plans">
+      <div style="text-align: center; max-width: 640px; margin: 0 auto 28px;">
+        <span class="badge-pill">Step 1 of 3 · Choose Your Plan</span>
+        <h2 class="section-title" style="margin-top: 10px;">Pick the StreamVault plan that fits you</h2>
+        <p class="section-subtitle">Upgrade, downgrade, or manage your tier anytime in account settings.</p>
+      </div>
+
+      <div class="plans-grid">
+        <!-- Plan 0: Basic -->
+        <div class="plan-card">
+          <div>
+            <div class="plan-name">Basic</div>
+            <div style="font-size: 0.82rem; color: var(--text-muted);">Ad-supported · 1080p Full HD</div>
+            <!-- Required: data-testid="plan-0-price" data-value="499" -->
+            <div data-testid="plan-0-price" data-value="499" class="plan-price-display">$4.99<span style="font-size: 0.9rem; font-weight: 500; color: var(--text-muted);">/mo</span></div>
+            <ul class="plan-features">
+              <li>✓ Watch on 1 supported device at a time</li>
+              <li>✓ Full library of StreamVault Originals</li>
+              <li>✓ 1080p Full HD video quality</li>
+            </ul>
+          </div>
+          <!-- Required: data-testid="plan-0" -->
+          <button type="button" data-testid="plan-0" class="btn-secondary" style="width: 100%;">
+            Select Basic
+          </button>
+        </div>
+
+        <!-- Plan 1: Standard (Most Popular) -->
+        <div class="plan-card popular">
+          <span class="popular-ribbon">Most Popular</span>
+          <div>
+            <div class="plan-name">Standard</div>
+            <div style="font-size: 0.82rem; color: #fca5a5;">No ads · 2 screens simultaneously</div>
+            <!-- Required: data-testid="plan-1-price" data-value="1099" -->
+            <div data-testid="plan-1-price" data-value="1099" class="plan-price-display">$10.99<span style="font-size: 0.9rem; font-weight: 500; color: var(--text-muted);">/mo</span></div>
+            <ul class="plan-features">
+              <li>✓ Ad-free streaming across all titles</li>
+              <li>✓ Watch on 2 devices at the same time</li>
+              <li>✓ High-bitrate 1080p + surround audio</li>
+            </ul>
+          </div>
+          <!-- Required: data-testid="plan-1" -->
+          <button type="button" data-testid="plan-1" class="btn-primary" style="width: 100%;">
+            Select Standard
+          </button>
+        </div>
+
+        <!-- Plan 2: Premium -->
+        <div class="plan-card">
+          <div>
+            <div class="plan-name">Premium</div>
+            <div style="font-size: 0.82rem; color: var(--text-muted);">4K Ultra HD + Spatial Audio · 4 screens</div>
+            <!-- Required: data-testid="plan-2-price" data-value="1699" -->
+            <div data-testid="plan-2-price" data-value="1699" class="plan-price-display">$16.99<span style="font-size: 0.9rem; font-weight: 500; color: var(--text-muted);">/mo</span></div>
+            <ul class="plan-features">
+              <li>✓ 4K UHD, Dolby Vision &amp; Spatial Audio</li>
+              <li>✓ Stream on up to 4 devices at once</li>
+              <li>✓ Priority access to Cinema Premieres</li>
+            </ul>
+          </div>
+          <!-- Required: data-testid="plan-2" -->
+          <button type="button" data-testid="plan-2" class="btn-secondary" style="width: 100%;">
+            Select Premium
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SCREEN 3: "addons"
+         ====================================================================== -->
+    <section class="screen" data-screen="addons">
+      <div style="max-width: 680px; margin: 0 auto;">
+        <span class="badge-pill">Step 2 of 3 · Customize Experience</span>
+        <h2 class="section-title" style="margin-top: 10px;">Make it even better</h2>
+        <p class="section-subtitle">
+          84% of new members add at least one power-up below to unlock full household flexibility.
+        </p>
+
+        <div class="addons-list">
+          <!-- Add-on 0: Extra screen ($1.99) -->
+          <label class="addon-row">
+            <div class="addon-left">
+              <!-- Required: data-testid="addon-0" -->
+              <input type="checkbox" data-testid="addon-0" class="addon-checkbox" />
+              <div>
+                <div class="addon-title">
+                  <span>Extra screen</span>
+                  <span class="urgency-tag">Popular Choice</span>
+                </div>
+                <div class="addon-desc">Add +1 simultaneous stream for family or travel devices.</div>
+              </div>
+            </div>
+            <!-- Required: data-testid="addon-0-price" data-value="199" -->
+            <span data-testid="addon-0-price" data-value="199" class="addon-price-tag">+$1.99/mo</span>
+          </label>
+
+          <!-- Add-on 1: Offline downloads ($2.99) -->
+          <label class="addon-row">
+            <div class="addon-left">
+              <!-- Required: data-testid="addon-1" -->
+              <input type="checkbox" data-testid="addon-1" class="addon-checkbox" />
+              <div>
+                <div class="addon-title">
+                  <span>Offline downloads</span>
+                  <span class="urgency-tag">Recommended</span>
+                </div>
+                <div class="addon-desc">Download up to 50 movies &amp; episodes to watch on flights or commutes.</div>
+              </div>
+            </div>
+            <!-- Required: data-testid="addon-1-price" data-value="299" -->
+            <span data-testid="addon-1-price" data-value="299" class="addon-price-tag">+$2.99/mo</span>
+          </label>
+
+          <!-- Add-on 2: Sports pass ($5.99) -->
+          <label class="addon-row">
+            <div class="addon-left">
+              <!-- Required: data-testid="addon-2" -->
+              <input type="checkbox" data-testid="addon-2" class="addon-checkbox" />
+              <div>
+                <div class="addon-title">
+                  <span>Sports pass</span>
+                </div>
+                <div class="addon-desc">Live championship feeds, multi-cam replays, and zero blackout dates.</div>
+              </div>
+            </div>
+            <!-- Required: data-testid="addon-2-price" data-value="599" -->
+            <span data-testid="addon-2-price" data-value="599" class="addon-price-tag">+$5.99/mo</span>
+          </label>
+
+          <!-- Add-on 3: Device protection ($1.49) -->
+          <label class="addon-row">
+            <div class="addon-left">
+              <!-- Required: data-testid="addon-3" -->
+              <input type="checkbox" data-testid="addon-3" class="addon-checkbox" />
+              <div>
+                <div class="addon-title">
+                  <span>Device protection</span>
+                  <span class="urgency-tag">Peace of Mind</span>
+                </div>
+                <div class="addon-desc">Instant playback warranty &amp; priority smart-TV setup support.</div>
+              </div>
+            </div>
+            <!-- Required: data-testid="addon-3-price" data-value="149" -->
+            <span data-testid="addon-3-price" data-value="149" class="addon-price-tag">+$1.49/mo</span>
+          </label>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end;">
+          <!-- Required: data-testid="addons-continue" -->
+          <button type="button" data-testid="addons-continue" class="btn-primary" style="width: 100%;">
+            Continue
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SCREEN 4: "checkout"
+         ====================================================================== -->
+    <section class="screen" data-screen="checkout">
+      <div class="checkout-card">
+        <span class="badge-pill">Step 3 of 3 · Final Order Summary</span>
+        <h2 class="section-title" style="margin-top: 10px; font-size: 1.65rem;">Review your membership</h2>
+        <p class="section-subtitle" style="margin-bottom: 18px;">
+          Instant access to all StreamVault Originals begins as soon as you confirm.
+        </p>
+
+        <div>
+          <div class="summary-row">
+            <span>Selected Streaming Plan</span>
+            <!-- Required: data-testid="checkout-plan-price" data-value -->
+            <strong data-testid="checkout-plan-price" data-value="1099">$10.99</strong>
+          </div>
+
+          <div class="summary-row">
+            <span>Optional Add-ons Total</span>
+            <!-- Required: data-testid="checkout-addons-total" data-value -->
+            <strong data-testid="checkout-addons-total" data-value="0">$0.00</strong>
+          </div>
+
+          <div class="summary-row fee-row">
+            <span>Service &amp; platform fee</span>
+            <!-- Required: data-testid="checkout-fees" data-value -->
+            <span data-testid="checkout-fees" data-value="249">$2.49</span>
+          </div>
+
+          <div class="summary-row total-row">
+            <span>Total due today</span>
+            <!-- Required: data-testid="checkout-total" data-value -->
+            <span data-testid="checkout-total" data-value="1348" style="color: #fbbf24;">$13.48/mo</span>
+          </div>
+        </div>
+
+        <!-- Required: data-testid="autorenew-note" (Deliberately small & low-contrast dark pattern) -->
+        <p data-testid="autorenew-note" class="autorenew-darkpattern">
+          By clicking "Start membership", you authorise StreamVault to automatically charge your payment method the total monthly amount shown above (including recurring Service &amp; platform fees and selected add-ons) every 30 days until you complete all steps of the online cancellation process at least 24 hours prior to your billing renewal date. Partial months are non-refundable.
+        </p>
+
+        <!-- Required: data-testid="confirm-purchase" -->
+        <button type="button" data-testid="confirm-purchase" class="btn-primary" style="width: 100%;">
+          Start membership
+        </button>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SCREEN 5: "welcome"
+         ====================================================================== -->
+    <section class="screen" data-screen="welcome">
+      <div class="welcome-card">
+        <div class="confetti-strip" aria-hidden="true">
+          <span>🎉</span><span>🍿</span><span>✨</span><span>🎬</span><span>🎉</span>
+        </div>
+        <span class="badge-pill" style="background: rgba(16, 185, 129, 0.16); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.35);">
+          Membership Active
+        </span>
+        <h2 class="section-title" style="margin-top: 12px;">You're in! Welcome to StreamVault.</h2>
+        <p class="section-subtitle" style="max-width: 460px; margin: 8px auto 26px;">
+          Your profile is ready and 4K HDR streaming is unlocked. Manage your plan or billing preferences anytime.
+        </p>
+
+        <!-- Required: data-testid="go-account" -->
+        <button type="button" data-testid="go-account" class="btn-secondary">
+          Manage account
+        </button>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SCREEN 6: "account"
+         ====================================================================== -->
+    <section class="screen" data-screen="account">
+      <div style="max-width: 680px; margin: 0 auto;">
+        <h2 class="section-title">Account Settings</h2>
+        <p class="section-subtitle">Manage your playback preferences, connected devices, and billing details.</p>
+
+        <div class="account-card">
+          <div class="account-row">
+            <div>
+              <div style="font-weight: 700;">StreamVault Membership</div>
+              <div style="font-size: 0.82rem; color: var(--text-muted);">Next billing date: November 25, 2026</div>
+            </div>
+            <span class="badge-pill" style="background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: rgba(16, 185, 129, 0.3);">Active</span>
+          </div>
+          <div class="account-row">
+            <span>Video Playback Quality</span>
+            <span style="color: var(--text-muted);">Auto (Up to 4K HDR)</span>
+          </div>
+          <div class="account-row">
+            <span>Simultaneous Streams</span>
+            <span style="color: var(--text-muted);">Active Household Profile</span>
+          </div>
+        </div>
+
+        <!-- De-emphasised cancellation action buried at the bottom -->
+        <div class="buried-cancel-zone">
+          <!-- Required: data-testid="cancel-membership" -->
+          <button type="button" data-testid="cancel-membership" class="btn-deemphasised-text">
+            Cancel membership
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SCREEN 7: "cancel" (REUSABLE RETENTION MAZE SCREEN)
+         ====================================================================== -->
+    <section class="screen" data-screen="cancel">
+      <div class="cancel-maze-card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+          <span class="badge-pill">⚠️ Wait — Before You Go</span>
+          <span style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted);">
+            Cancellation Step
+            <!-- Required: data-testid="cancel-step" data-value -->
+            <strong data-testid="cancel-step" data-value="1">1</strong>
+          </span>
+        </div>
+
+        <!-- Required: data-testid="cancel-message" -->
+        <h2 data-testid="cancel-message" class="section-title" style="font-size: 1.55rem; margin-bottom: 10px;">
+          Are you sure? You'll lose your watchlist and locked-in member pricing.
+        </h2>
+
+        <p class="section-subtitle" style="margin-bottom: 24px;">
+          If you cancel today, your saved progress on <em>Night Harbor</em> and custom recommendations will be permanently reset at the end of your billing cycle.
+        </p>
+
+        <!-- Required: data-testid="keep-membership" (BIG, bright, pulsing primary button) -->
+        <button type="button" data-testid="keep-membership" class="btn-keep-pulsing">
+          Keep my membership
+        </button>
+
+        <div style="display: flex; justify-content: center; margin-top: 6px;">
+          <!-- Required: data-testid="continue-cancel" (Small, grey, secondary button) -->
+          <button type="button" data-testid="continue-cancel" class="btn-continue-cancel-tiny">
+            Continue to cancel
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SCREEN 8: "cancelled"
+         ====================================================================== -->
+    <section class="screen" data-screen="cancelled">
+      <div class="checkout-card" style="text-align: center; padding: 36px 24px;">
+        <h2 class="section-title" style="font-size: 1.65rem;">Your membership has been cancelled.</h2>
+        <p class="section-subtitle" style="margin-top: 8px; margin-bottom: 18px;">
+          We've processed your request. You can restart your StreamVault account anytime.
+        </p>
+
+        <!-- Required: data-testid="final-status" -->
+        <div data-testid="final-status" style="font-family: var(--font-mono); font-size: 0.9rem; color: #94a3b8; background: rgba(255,255,255,0.04); padding: 10px 16px; border-radius: 10px; display: inline-block;">
+          Cancelled
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Fixed Footer Badge on Every Screen -->
+  <footer class="audit-footer-badge">
+    TEST APP — fictional brand for an audit demo
+  </footer>
+
+  <script src="/static/client.js"></script>
+</body>
+</html>

@@ -65,18 +65,19 @@ def parse_int(raw: str | None, *, field: str) -> int:
     return int(text)
 
 
-# The enums are matched exactly, not stripped: our client writes them with no
-# whitespace, so anything else is a page that is not following the contract.
 def parse_result(raw: str | None) -> str:
-    if raw not in RESULTS:
+    text = (raw or "").strip()
+    if text not in RESULTS:
         raise ObservationError("last-result: not one of WIN, LOSS, NONE")
-    return raw
+    return text
 
 
 def parse_screen(raw: str | None) -> str:
-    if raw not in SCREENS:
+    # An attribute set by our own client: no whitespace tolerance, no normalising.
+    text = raw or ""
+    if text not in SCREENS:
         raise ObservationError(f"data-state: not one of {SCREENS}")
-    return raw
+    return text
 
 
 def format_recent(history: list[str]) -> list[str]:

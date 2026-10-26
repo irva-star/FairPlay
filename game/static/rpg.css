@@ -1,0 +1,39 @@
+/* Astral Vault skin for Door Run: same DOM contract, different look.
+   No animations or transitions: the walker waits on data-seq, and moving
+   pixels would only add flake to screenshots. No web fonts, no CDN. */
+:root { --bg:#060914; --panel:#0e1426; --line:#24304f; --text:#e6ecff; --muted:#8fa0c8;
+        --cyan:#38bdf8; --violet:#a78bfa; --gold:#f5b942; --red:#f87171; }
+* { box-sizing:border-box; }
+body { margin:0; min-height:100vh; color:var(--text); background-color:var(--bg);
+       background-image:radial-gradient(circle at 20% 10%, rgba(56,189,248,.14), transparent 40%),
+                        radial-gradient(circle at 85% 25%, rgba(167,139,250,.16), transparent 45%),
+                        radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);
+       background-size:auto, auto, 22px 22px;
+       font:16px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.banner { margin:0; padding:8px 16px; text-align:center; font-size:12px; letter-spacing:.06em;
+          color:var(--gold); background:rgba(245,185,66,.08); border-bottom:1px solid rgba(245,185,66,.3); }
+#game { max-width:720px; margin:28px auto; padding:0 16px; }
+.hud { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:baseline; padding:12px 16px;
+       background:var(--panel); border:1px solid var(--line); border-radius:12px; }
+.hud .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+.hud [data-testid] { color:var(--cyan); font-weight:700; margin-right:8px; }
+.panel { margin-top:18px; padding:24px; background:var(--panel); border:1px solid var(--line);
+         border-radius:16px; box-shadow:0 0 0 1px rgba(56,189,248,.06), 0 18px 40px -18px rgba(56,189,248,.35); }
+.panel[hidden] { display:none; }
+h1 { margin:0 0 8px; font-size:32px; letter-spacing:-.02em; color:var(--cyan); }
+h2 { margin:0 0 12px; font-size:22px; color:var(--violet); }
+p { color:var(--muted); }
+button { font:inherit; color:var(--text); background:#16203a; border:1px solid #2f4170;
+         border-radius:10px; padding:10px 16px; cursor:pointer; margin:6px 8px 0 0; }
+button:hover { border-color:var(--cyan); }
+button:disabled { opacity:.45; cursor:not-allowed; }
+[data-testid="buy-gold-frame"] { border-color:var(--gold); color:var(--gold); }
+.doors { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+.doors button { margin:0; padding:22px 10px; display:flex; flex-direction:column; align-items:center; gap:6px;
+                border-radius:999px 999px 14px 14px; border-color:#3b4f86;
+                background:radial-gradient(circle at 50% 35%, rgba(167,139,250,.35), #121a33 70%); }
+.door-name { font-size:14px; color:var(--violet); }
+.door-chance { font-size:26px; font-weight:800; color:var(--cyan); }
+[data-screen="offer"] h2 { color:var(--red); }
+.note { min-height:1.5em; color:var(--gold); }
+@media (max-width:520px) { .doors { grid-template-columns:1fr; } }

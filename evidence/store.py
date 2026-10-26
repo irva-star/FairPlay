@@ -36,6 +36,14 @@ def connect(path: str | Path = DEFAULT_DB, *, read_only: bool = False) -> sqlite
     return conn
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after the first release to an existing database."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(runs)")}
+    for name in ("switch", "app"):
+        if name not in cols:
+            conn.execute(f"ALTER TABLE runs ADD COLUMN {name} TEXT")
+
+
 class EvidenceStore:
     def __init__(self, path: str | Path = DEFAULT_DB, *, read_only: bool = False) -> None:
         self.path = Path(path)
@@ -43,26 +51,10 @@ class EvidenceStore:
         self.conn = connect(path, read_only=read_only)
         if not read_only:
             self.conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-            self._migrate()
+            _migrate(self.conn)
             self.conn.commit()
         self._chain: dict[str, str] = {}
         self._seq: dict[str, int] = {}
-
-    def _migrate(self) -> None:
-        """Bring a database created by an older schema up to date, in place."""
-        columns = {r["name"] for r in self.conn.execute("PRAGMA table_info(runs)")}
-        if "switch" not in columns:
-            self.conn.execute("ALTER TABLE runs ADD COLUMN switch TEXT")
-        # Older stores appended a duplicate result row on every re-analysis;
-        # keep the newest before the unique index can be created.
-        self.conn.execute(
-            "DELETE FROM results WHERE rowid NOT IN ("
-            " SELECT MAX(rowid) FROM results GROUP BY run_id, contrast, metric)"
-        )
-        self.conn.execute("DROP INDEX IF EXISTS idx_results_run")
-        self.conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_results ON results(run_id, contrast, metric)"
-        )
 
     def close(self) -> None:
         self.conn.close()
@@ -75,14 +67,15 @@ class EvidenceStore:
 
     # --- runs, approvals, sessions -------------------------------------------
 
-    def create_run(self, run_id: str, *, label: str, switch: str | None = None,
-                   config_hash: str = "", plan_hash: str = "", approval_id: int | None = None,
-                   git_commit: str = "", status: str = "running") -> None:
+    def create_run(self, run_id: str, *, label: str, config_hash: str = "",
+                   plan_hash: str = "", approval_id: int | None = None,
+                   git_commit: str = "", status: str = "running",
+                   switch: str | None = None, app: str = "doorrun") -> None:
         self.conn.execute(
             "INSERT OR REPLACE INTO runs(run_id,label,created_at,config_hash,plan_hash,"
-            "approval_id,git_commit,status,switch) VALUES(?,?,?,?,?,?,?,?,?)",
+            "approval_id,git_commit,status,switch,app) VALUES(?,?,?,?,?,?,?,?,?,?)",
             (run_id, label, _now(), config_hash, plan_hash, approval_id, git_commit, status,
-             switch),
+             switch, app),
         )
         self.conn.commit()
 
@@ -169,8 +162,13 @@ class EvidenceStore:
         self.conn.commit()
 
     def write_result(self, run_id: str, row: dict[str, Any]) -> None:
+        # Re-running the analysis replaces a result rather than duplicating it.
         self.conn.execute(
-            "INSERT OR REPLACE INTO results(run_id,contrast,metric,n_a,n_b,diff,ci_low,ci_high,hedges_g,"
+            "DELETE FROM results WHERE run_id=? AND contrast=? AND metric=?",
+            (run_id, row["contrast"], row["metric"]),
+        )
+        self.conn.execute(
+            "INSERT INTO results(run_id,contrast,metric,n_a,n_b,diff,ci_low,ci_high,hedges_g,"
             "p_raw,p_holm,tost_p,margin,verdict,prereg_hash,computed_at)"
             " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (run_id, row["contrast"], row["metric"], row["n_a"], row["n_b"], row["diff"],

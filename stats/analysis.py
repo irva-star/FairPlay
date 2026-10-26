@@ -142,7 +142,19 @@ def estimate(metric: str, contrast: str, a, b, margin: float, *,
         mean_a=w["mean_a"], mean_b=w["mean_b"], diff=w["diff"],
         se=w["se"], df=w["df"], note=w["note"] or "",
     )
-    if w["df"] is None or w["se"] in (None, 0.0):
+    if w["se"] == 0.0 and w["diff"] is not None:
+        # Every session in both groups scored identically. No test is needed:
+        # the difference is known exactly, so judge it against the margin.
+        diff = float(w["diff"])
+        est.ci_low = est.ci_high = diff
+        if diff == 0.0:
+            est.verdict = V.EQUIVALENT
+            est.note = "identical value in every session of both groups"
+        else:
+            est.verdict = V.DIFFERENCE_DETECTED if abs(diff) > margin else V.BELOW_MARGIN
+            est.note = "zero variance in both groups; difference is exact"
+        return est
+    if w["df"] is None or w["se"] is None:
         # Nothing testable. verdict.decide turns the missing p-values into
         # "Inconclusive" rather than letting NaN reach the dashboard.
         est.verdict = V.decide(None, None, alpha=alpha)
@@ -165,7 +177,8 @@ HOLM_FAMILY = ("M1", "M2", "M3", "M4")
 
 
 def analyse_contrast(contrast: str, by_metric: dict[str, tuple], margins: dict[str, float],
-                     *, alpha: float = V.ALPHA, bootstrap: bool = True) -> list[Estimate]:
+                     *, alpha: float = V.ALPHA, bootstrap: bool = True,
+                     family: tuple[str, ...] = HOLM_FAMILY) -> list[Estimate]:
     """Estimate every metric for one contrast, then Holm-correct M1 to M4.
 
     B1 is a balance check and deliberately sits outside the Holm family: it asks
@@ -177,17 +190,18 @@ def analyse_contrast(contrast: str, by_metric: dict[str, tuple], margins: dict[s
         estimates[metric] = estimate(metric, contrast, a, b, margins[metric],
                                      alpha=alpha, bootstrap=bootstrap)
 
-    family = [m for m in HOLM_FAMILY if m in estimates]
-    adjusted = V.holm([estimates[m].p_raw for m in family], alpha=alpha)
-    for metric, p_adj in zip(family, adjusted):
+    # Exact (zero-variance) results have no p-value and keep their verdict.
+    tested = [m for m in family if m in estimates and estimates[m].p_raw is not None]
+    adjusted = V.holm([estimates[m].p_raw for m in tested], alpha=alpha)
+    for metric, p_adj in zip(tested, adjusted):
         est = estimates[metric]
         est.p_holm = p_adj
         est.verdict = V.decide(p_adj, est.tost_p, alpha=alpha)
 
     for metric, est in estimates.items():
-        if metric not in family:
+        if metric not in family and est.p_raw is not None:
             est.p_holm = est.p_raw  # outside the family: unadjusted, by design
             est.verdict = V.decide(est.p_raw, est.tost_p, alpha=alpha)
 
-    order = list(HOLM_FAMILY) + [m for m in estimates if m not in HOLM_FAMILY]
+    order = list(family) + [m for m in estimates if m not in family]
     return [estimates[m] for m in order if m in estimates]

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Astral Vault</title>
+  <!-- Nothing loads from the internet: no CDN links, no web fonts. -->
+  <link rel="stylesheet" href="/static/rpg.css">
+</head>
+<body>
+  <p class="banner">TEST GAME, planted rule (demo). Fake crystals only, no real money.</p>
+
+  <!-- data-state is one of: start, store, level, offer, done
+       data-seq is incremented by the client after each render completes. -->
+  <main id="game" data-state="start" data-seq="0">
+
+    <header class="hud">
+      <span class="label">Sector</span>
+      <!-- digits only -->
+      <span data-testid="level-no">1</span>
+      <span class="label">of</span>
+      <span data-testid="levels-total">10</span>
+      <span class="label">Crystals</span>
+      <span data-testid="gems">500</span>
+      <span class="label">Last jump</span>
+      <!-- WIN | LOSS | NONE -->
+      <span data-testid="last-result">NONE</span>
+    </header>
+
+    <section class="panel" data-screen="start">
+      <h1>Astral Vault</h1>
+      <p>Jump through one of three portals in each of 10 sectors. The percentage is your chance of a safe landing.</p>
+      <button data-testid="open-store" type="button">Visit outfitter</button>
+    </section>
+
+    <section class="panel" data-screen="store">
+      <h2>Outfitter</h2>
+      <p>Gold frame &mdash; 100 crystals. A cosmetic ship trim. It does not change how you play.</p>
+      <button data-testid="buy-gold-frame" type="button">Buy Gold frame</button>
+      <button data-testid="close-store" type="button">Leave outfitter</button>
+      <p data-testid="store-note" class="note"></p>
+    </section>
+
+    <section class="panel" data-screen="level">
+      <h2>Choose a portal</h2>
+      <div class="doors">
+        <button data-testid="door-0" type="button">
+          <span class="door-name">Portal α</span>
+          <span class="door-chance"><span data-testid="door-0-chance">0</span>%</span>
+        </button>
+        <button data-testid="door-1" type="button">
+          <span class="door-name">Portal β</span>
+          <span class="door-chance"><span data-testid="door-1-chance">0</span>%</span>
+        </button>
+        <button data-testid="door-2" type="button">
+          <span class="door-name">Portal γ</span>
+          <span class="door-chance"><span data-testid="door-2-chance">0</span>%</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel" data-screen="offer">
+      <h2>Hull breach!</h2>
+      <p>Emergency shield +1 retry for <span data-testid="offer-price">0</span> crystals.</p>
+      <button data-testid="offer-dismiss" type="button">No thanks</button>
+    </section>
+
+    <section class="panel" data-screen="done">
+      <h2>Expedition complete</h2>
+      <p>Safe landings: <span data-testid="wins">0</span> of <span data-testid="levels-played">10</span> sectors.</p>
+    </section>
+
+  </main>
+
+  <script src="/static/game.js"></script>
+</body>
+</html>

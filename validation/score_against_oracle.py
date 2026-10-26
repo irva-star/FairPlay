@@ -53,8 +53,13 @@ class OracleSession:
         return statistics.fmean(self.post_loss_best) if self.post_loss_best else None
 
 
-def load_oracle(path: str | Path = ORACLE_PATH) -> list[OracleSession]:
-    """Read ground truth and rebuild per-session M1 and M2."""
+def load_oracle(path: str | Path = ORACLE_PATH, *, seeds: set[int] | None = None) -> list[OracleSession]:
+    """Read ground truth and rebuild per-session M1 and M2.
+
+    `seeds` scopes the truth to one run (seeds are unique per batch), so other
+    runs' sessions -- earlier batches, an interrupted run, the OFF batch --
+    never leak into this run's ground truth (TECH_DEBT H5).
+    """
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
@@ -66,6 +71,8 @@ def load_oracle(path: str | Path = ORACLE_PATH) -> list[OracleSession]:
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
             row = json.loads(line)
+            if seeds is not None and row.get("seed") not in seeds:
+                continue
             levels[row["pid"]].append(row)
 
     sessions: list[OracleSession] = []
@@ -118,7 +125,9 @@ class RecoveryRow:
 def score(conn, run_id: str, *, contrast: str = "V1_sensitivity",
           oracle_path: str | Path = ORACLE_PATH,
           metrics: tuple[str, ...] = ("M1", "M2")) -> list[RecoveryRow]:
-    sessions = load_oracle(oracle_path)
+    seeds = {r[0] for r in conn.execute(
+        "SELECT DISTINCT seed FROM sessions WHERE run_id=?", (run_id,))}
+    sessions = load_oracle(oracle_path, seeds=seeds)
     rows: list[RecoveryRow] = []
     for metric in metrics:
         result = conn.execute(

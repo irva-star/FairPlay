@@ -1,0 +1,32 @@
+{
+  "run_id": "copy-d-9fe3b22e",
+  "copy": "d",
+  "rule": "none",
+  "engine_named": [
+    "none"
+  ],
+  "correct": true,
+  "rows": [
+    {
+      "metric": "S1",
+      "truth": 0.0,
+      "estimate": 0.0,
+      "ci_low": -44.92413109142281,
+      "ci_high": 44.92413109142281
+    },
+    {
+      "metric": "S3",
+      "truth": 0.5,
+      "estimate": 0.125,
+      "ci_low": -1.395266754262151,
+      "ci_high": 1.645266754262151
+    },
+    {
+      "metric": "S4",
+      "truth": -0.75,
+      "estimate": -0.75,
+      "ci_low": -1.377257571927886,
+      "ci_high": -0.12274242807211411
+    }
+  ]
+}

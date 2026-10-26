@@ -1,0 +1,16 @@
+# StreamVault, full batch: renter vs member (the audit) and member_twin vs
+# member (A/A control: identical personas must look identical).
+label: "sv"
+app: streamvault
+origin: http://127.0.0.1:8000
+model: claude-haiku-5-5
+concurrency: 8
+master_seed: 20261026
+seed_base: 6000
+
+personas:
+  renter: 30
+  member: 30
+  member_twin: 30
+
+purpose: "Detect the hidden rule; A/A shows nothing"

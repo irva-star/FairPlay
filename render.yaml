@@ -1,0 +1,41 @@
+# Render Blueprint: the two public services (docs/SPEC.md section 15).
+#
+# Neither service gets ANTHROPIC_API_KEY (rule S12). The agents run on a laptop.
+# JUDGE_RULES is a secret set in the Render dashboard (sync: false), never in
+# this public file, so reading the repo can't spoil the hidden rules.
+
+services:
+  - type: web
+    name: streamvault
+    runtime: python
+    plan: free
+    region: ohio
+    buildCommand: pip install -r requirements-game.txt
+    startCommand: >-
+      uvicorn streamvault.server:app --host 0.0.0.0 --port $PORT --workers 1
+      --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: JUDGE_RULES          # e.g. a=fee,b=none,c=maze,d=preticked (paste from oracle/judge_rules.secret)
+        sync: false
+      - key: ORACLE_SINK          # ground truth goes to private logs only
+        value: stdout
+      - key: DASHBOARD_URL        # link on the spot-the-trap page; set after the dashboard deploys
+        sync: false
+
+  - type: web
+    name: fairplay-dashboard
+    runtime: python
+    plan: free
+    region: ohio
+    buildCommand: pip install -r requirements-dashboard.txt
+    startCommand: >-
+      streamlit run dashboard/app.py --server.address 0.0.0.0 --server.port $PORT
+      --server.headless true --browser.gatherUsageStats false
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: FAIRPLAY_MODE        # read-only snapshot, no run/approve/export pages
+        value: public

@@ -1,0 +1,44 @@
+# Pre-registration for the StreamVault audit (SPEC section 16).
+#
+# Commit this file BEFORE the batches. Its hash is stored with every result
+# row. The hidden judge rule is not named anywhere here: the engine must find
+# it from the metrics alone, and validation/ reveals it from the oracle after.
+
+version: 1
+case: streamvault-subscription-traps
+unit_of_analysis: session
+alpha: 0.05
+sessions_per_persona: 30     # 8 in the live batch; effects planted are large
+
+model:
+  id: claude-haiku-5-5
+  request_settings:
+    max_tokens: 256
+    tool_choice: {type: any, disable_parallel_tool_use: true}
+    temperature: unset
+    assistant_prefill: never
+
+# Margins are the smallest difference a consumer would care about.
+metrics:
+  S1: {name: "Service fee at checkout (cents)",            role: primary,          margin: 50}
+  S2: {name: "Checkout total minus advertised (cents)",    role: primary,          margin: 100}
+  S3: {name: "Clicks needed to finish cancelling",         role: primary,          margin: 1}
+  S4: {name: "Add-ons pre-ticked on arrival",              role: primary,          margin: 0.5}
+  S5: {name: "Basic plan price shown (cents)",             role: negative_control, margin: 10}
+  B1: {name: "Chose the Basic plan",                       role: balance_check,    margin: 0.15}
+
+# batch "any": the rule is hidden, so both contrasts run on every StreamVault run.
+contrasts:
+  SV_audit: {batch: "any", a: renter,      b: member}
+  SV_aa:    {batch: "any", a: member_twin, b: member}
+
+multiplicity:
+  method: holm
+  family: [S1, S2, S3, S4, S5]
+  outside_family: [B1]
+
+verdict_rule:
+  - {holm_p_lt_alpha: true,  tost_p_lt_alpha: false, verdict: "Difference detected"}
+  - {holm_p_lt_alpha: true,  tost_p_lt_alpha: true,  verdict: "Detected, below the margin of concern"}
+  - {holm_p_lt_alpha: false, tost_p_lt_alpha: true,  verdict: "Equivalent: no meaningful difference"}
+  - {holm_p_lt_alpha: false, tost_p_lt_alpha: false, verdict: "Inconclusive"}

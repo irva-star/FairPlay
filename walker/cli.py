@@ -25,11 +25,12 @@ from pathlib import Path
 from typing import Any
 
 from evidence.store import DEFAULT_DB, EvidenceStore
-from walker import guard, prompts
+from walker import guard
 from walker.budget import (
     BudgetExceeded, BudgetGuard, Pricing, estimate_session_cost, load_pricing,
 )
-from walker.agent import MAX_STEPS, SessionDeps, run_session
+from walker.agent import MAX_STEPS, SessionDeps
+from walker.apps import get_app
 from walker.writer import EvidenceWriter
 
 PERSONAS_PATH = Path("configs/personas.yaml")
@@ -80,6 +81,15 @@ def load_yaml(path: str | Path) -> dict:
     return yaml.safe_load(Path(path).read_text(encoding="utf-8"))
 
 
+def on_off(value: Any) -> str:
+    """YAML 1.1 reads bare on/off as booleans. Accept both, return the string."""
+    if value is True or str(value).strip().lower() == "on":
+        return "on"
+    if value is False or str(value).strip().lower() == "off":
+        return "off"
+    raise ValueError(f"switch must be on or off, got {value!r}")
+
+
 def git_commit() -> str:
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True,
@@ -92,6 +102,7 @@ def git_commit() -> str:
 @dataclass
 class Plan:
     label: str
+    app: str
     origin: str
     switch: str
     model: str
@@ -120,7 +131,7 @@ class Plan:
 
     def hashable(self) -> dict:
         return {
-            "label": self.label, "origin": self.origin, "switch": self.switch,
+            "label": self.label, "app": self.app, "origin": self.origin, "switch": self.switch,
             "model": self.model, "personas": self.personas, "seed_base": self.seed_base,
             "master_seed": self.master_seed, "max_steps": self.max_steps,
             "system_prompt_hash": self.system_prompt_hash, "tools_hash": self.tools_hash,
@@ -131,23 +142,8 @@ class Plan:
         return _sha256(_canonical(self.hashable()))
 
 
-def _check_config(config: dict, config_path: str | Path) -> None:
-    """Reject YAML 1.1 surprises: a bare `on` or `off` loads as a boolean.
-
-    An unquoted `label: on` used to become the run label "True", and no analysis
-    contrast ever matched it. Quote the values: `label: "on"`, `switch: "on"`.
-    """
-    label = config.get("label")
-    if not isinstance(label, str) or not label:
-        raise ValueError(f"{config_path}: label must be a quoted string, got {label!r}")
-    switch = config.get("switch")
-    if switch not in ("on", "off"):
-        raise ValueError(f"{config_path}: switch must be \"on\" or \"off\" (quoted), got {switch!r}")
-
-
 def build_plan(config_path: str | Path, *, concurrency: int | None = None) -> Plan:
     config = load_yaml(config_path)
-    _check_config(config, config_path)
     personas_cfg = load_yaml(PERSONAS_PATH)["personas"]
 
     personas = {name: int(n) for name, n in (config.get("personas") or {}).items()}
@@ -155,18 +151,29 @@ def build_plan(config_path: str | Path, *, concurrency: int | None = None) -> Pl
         if name not in personas_cfg:
             raise ValueError(f"persona {name!r} is not defined in {PERSONAS_PATH}")
 
+    label = config["label"]
+    if isinstance(label, bool):
+        raise ValueError(f"{config_path}: label loaded as a boolean; quote it, e.g. label: \"on\"")
+
+    app_name = str(config.get("app", "doorrun"))
+    app = get_app(app_name)
+    # Door Run's condition is set by PLANTED_SWITCH. StreamVault's hidden judge
+    # rule is deliberately NOT part of the plan: the audit must find it blind.
+    switch = on_off(config.get("switch", "off")) if app_name == "doorrun" else "hidden"
+
     plan = Plan(
-        label=config["label"],
+        label=str(label),
+        app=app_name,
         origin=str(config["origin"]),
-        switch=config["switch"],
+        switch=switch,
         model=str(config.get("model", "claude-haiku-5-5")),
         personas=personas,
         seed_base=int(config.get("seed_base", 0)),
         master_seed=int(config.get("master_seed", 0)),
         concurrency=int(concurrency or config.get("concurrency", 4)),
         max_steps=int(config.get("max_steps", MAX_STEPS)),
-        system_prompt_hash=prompts.system_prompt_hash(),
-        tools_hash=prompts.tools_hash(),
+        system_prompt_hash=app.system_prompt_hash(),
+        tools_hash=app.tools_hash(),
         config_hash=_sha256(_canonical(config)),
     )
 
@@ -187,9 +194,12 @@ def build_plan(config_path: str | Path, *, concurrency: int | None = None) -> Pl
 def print_plan(plan: Plan, pricing: Pricing, *, spent: float) -> None:
     remaining = max(0.0, pricing.caps.run - spent)
     estimate = plan.estimated_cost(pricing)
-    print(f"Run plan: {plan.label}")
+    print(f"Run plan: {plan.label}  (app: {plan.app})")
     print(f"  origin               {plan.origin}")
-    print(f"  server switch        PLANTED_SWITCH={plan.switch}")
+    if plan.app == "doorrun":
+        print(f"  server switch        PLANTED_SWITCH={plan.switch}")
+    else:
+        print("  server rule          hidden (set by JUDGE_RULE on the server; not in this plan)")
     print(f"  model                {plan.model}")
     print(f"  personas             " + ", ".join(f"{k} x{v}" for k, v in sorted(plan.personas.items())))
     print(f"  sessions             {plan.sessions}")
@@ -272,32 +282,38 @@ async def _run_batch(plan: Plan, pricing: Pricing, store: EvidenceStore,
     from walker.ratelimit import RateLimiter
 
     personas_cfg = load_yaml(PERSONAS_PATH)["personas"]
+    app = get_app(plan.app)
     run_id = f"{plan.label}-{uuid.uuid4().hex[:8]}"
     approval = store.find_approval(kind="run_plan", object_hash=plan.plan_hash)
-    store.create_run(run_id, label=plan.label, switch=plan.switch, config_hash=plan.config_hash,
+    store.create_run(run_id, label=plan.label, config_hash=plan.config_hash,
                      plan_hash=plan.plan_hash, approval_id=approval["approval_id"],
-                     git_commit=git_commit(), status="running")
+                     git_commit=git_commit(), status="running", switch=plan.switch,
+                     app=plan.app)
 
     limiter = RateLimiter(default_requests_per_minute=pricing.default_requests_per_minute,
                           fraction=pricing.header_safety_fraction)
-    llm = FakeLLM(seed=plan.master_seed) if args.llm == "fake" else AnthropicWalker(
-        limiter, model=plan.model)
+    llm = (FakeLLM(seed=plan.master_seed, policy=app.fake_policy) if args.llm == "fake"
+           else AnthropicWalker(limiter, model=plan.model, tools=app.TOOLS))
 
     blocked: list[str] = []
     semaphore = asyncio.Semaphore(plan.concurrency)
     results = []
 
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True, args=guard.chromium_args())
+        # CHROMIUM_EXECUTABLE lets a machine use an installed Chrome for Testing
+        # instead of Playwright's download. The guard's arguments apply either way.
+        browser = await pw.chromium.launch(
+            headless=True, args=guard.chromium_args(),
+            executable_path=os.environ.get("CHROMIUM_EXECUTABLE") or None,
+        )
         async with EvidenceWriter(store) as writer:
 
             async def one(persona: str, seed: int) -> None:
                 async with semaphore:
                     attempts = pricing.limits.session_retries + 1
                     for attempt in range(1, attempts + 1):
-                        # Each attempt is its own session with its own hash chain,
-                        # so a retry never appends to a failed attempt's events.
-                        # The analysis keeps only the last attempt per seed.
+                        # One id per attempt, so a retry starts a fresh hash chain
+                        # instead of appending to the failed attempt's events.
                         session_id = f"{run_id}-{persona}-{seed}-a{attempt}"
                         store.start_session(session_id, run_id=run_id, persona=persona,
                                             seed=seed, attempts=attempt)
@@ -314,7 +330,7 @@ async def _run_batch(plan: Plan, pricing: Pricing, store: EvidenceStore,
                         try:
                             await page.goto(f"{plan.origin}/?seed={seed}")
                             result = await asyncio.wait_for(
-                                run_session(
+                                app.run_session(
                                     page, session_id=session_id, persona=persona,
                                     persona_sentence=personas_cfg[persona]["sentence"],
                                     seed=seed, run_id=run_id, max_steps=plan.max_steps,
@@ -334,10 +350,13 @@ async def _run_batch(plan: Plan, pricing: Pricing, store: EvidenceStore,
                             return
                         except Exception as exc:  # noqa: BLE001 - every failure is attrition
                             label = type(exc).__name__
-                            store.end_session(session_id, status=f"failed:{label}")
+                            detail = str(exc).splitlines()[0][:160] if str(exc) else ""
                             if attempt >= attempts:
-                                print(f"  {session_id}: failed after {attempt} attempts ({label})")
+                                store.end_session(session_id, status=f"failed:{label}")
+                                print(f"  {session_id}: failed after {attempt} attempts "
+                                      f"({label}: {detail})")
                             else:
+                                store.end_session(session_id, status=f"retried:{label}")
                                 print(f"  {session_id}: attempt {attempt} failed ({label}), retrying")
                         finally:
                             await context.close()

@@ -26,6 +26,60 @@ DEFAULT_OUT = Path("snapshot")
 DROP_TABLES = ()
 
 
+def initials(name: str) -> str:
+    """'Sarah Ng' -> 'S.N.' The public snapshot never carries a full name (H1)."""
+    parts = [p for p in name.replace(".", " ").split() if p]
+    return "".join(f"{p[0].upper()}." for p in parts) or "?"
+
+
+def scrub_people(db: Path) -> int:
+    conn = sqlite3.connect(db)
+    try:
+        rows = conn.execute("SELECT approval_id, approver FROM approvals").fetchall()
+        for approval_id, approver in rows:
+            conn.execute("UPDATE approvals SET approver=?, note='' WHERE approval_id=?",
+                         (initials(approver or ""), approval_id))
+        conn.commit()
+        conn.execute("VACUUM")
+        return len(rows)
+    finally:
+        conn.close()
+
+
+def drop_unfinished_runs(db: Path) -> list[str]:
+    """Interrupted runs stay in the local store (they're attrition) but not in public."""
+    conn = sqlite3.connect(db)
+    try:
+        runs = [r[0] for r in conn.execute("SELECT run_id FROM runs WHERE status != 'complete'")]
+        for run_id in runs:
+            sessions = [r[0] for r in conn.execute("SELECT session_id FROM sessions WHERE run_id=?", (run_id,))]
+            for sid in sessions:
+                conn.execute("DELETE FROM events WHERE session_id=?", (sid,))
+                conn.execute("DELETE FROM metrics WHERE session_id=?", (sid,))
+            conn.execute("DELETE FROM sessions WHERE run_id=?", (run_id,))
+            conn.execute("DELETE FROM results WHERE run_id=?", (run_id,))
+            conn.execute("DELETE FROM spend WHERE run_id=?", (run_id,))
+            conn.execute("DELETE FROM runs WHERE run_id=?", (run_id,))
+        conn.execute("DELETE FROM screenshots WHERE screenshot_id NOT IN "
+                     "(SELECT screenshot_id FROM events WHERE screenshot_id IS NOT NULL)")
+        conn.commit()
+        conn.execute("VACUUM")
+        return runs
+    finally:
+        conn.close()
+
+
+def copy_validation(src_dir: Path, out_dir: Path) -> int:
+    if not src_dir.exists():
+        return 0
+    out_dir.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for path in src_dir.glob("*.json"):
+        shutil.copy2(path, out_dir / path.name)
+        n += 1
+    return n
+
+
 def backup_db(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.exists():
@@ -91,8 +145,14 @@ def main(argv: list[str] | None = None) -> int:
     db_out = out / "evidence.db"
     shots_out = out / "screenshots"
     backup_db(src, db_out)
-    count = copy_referenced_screenshots(src, shots_out)
+    dropped = drop_unfinished_runs(db_out)
+    print(f"left out {len(dropped)} unfinished run(s)")
+    count = copy_referenced_screenshots(db_out, shots_out)
     rewrite_screenshot_paths(db_out, "snapshot/screenshots")
+    scrubbed = scrub_people(db_out)
+    reveals = copy_validation(Path("data/validation"), out / "validation")
+    print(f"replaced {scrubbed} approver name(s) with initials")
+    print(f"copied {reveals} validation file(s)")
 
     print(f"wrote {db_out}")
     print(f"copied {count} screenshot(s) to {shots_out}")

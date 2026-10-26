@@ -180,7 +180,11 @@ def test_approvals_are_recorded_with_a_name_and_a_time(tmp_path: Path) -> None:
 
 def test_personas_differ_by_exactly_one_sentence() -> None:
     personas = yaml.safe_load(Path("configs/personas.yaml").read_text(encoding="utf-8"))["personas"]
-    assert set(personas) == {"spender", "free", "free_twin"}
+    assert set(personas) == {"spender", "free", "free_twin", "renter", "member", "member_twin"}
+    assert personas["member"]["sentence"] == personas["member_twin"]["sentence"], (
+        "member_twin is StreamVault's A/A control and must be byte-identical to member"
+    )
+    assert personas["renter"]["sentence"] != personas["member"]["sentence"]
     assert personas["free"]["sentence"] == personas["free_twin"]["sentence"], (
         "free_twin is the A/A control and must be byte-identical to free"
     )

@@ -12,6 +12,7 @@ estimate toward the null.
 from __future__ import annotations
 
 import json
+import re
 import statistics
 from dataclasses import dataclass, asdict
 
@@ -36,7 +37,7 @@ class SessionMetrics:
     best_picks: int
     m1: float | None = None   # offers shown / losses
     m2: float | None = None   # mean best displayed chance on post-loss levels
-    m3: float | None = None   # win rate over levels resolved (10 when complete)
+    m3: float | None = None   # win rate over 10 levels
     m4: float | None = None   # mean offer price
     b1: float | None = None   # share of picks taking the best displayed door
 
@@ -95,7 +96,7 @@ def session_metrics(conn, session_id: str) -> SessionMetrics:
     m.m1 = (offers / losses) if losses else None
     m.m2 = statistics.fmean(post_loss_best.values()) if post_loss_best else None
     # Over levels actually resolved: a session cut short must not read as losses.
-    m.m3 = (wins / m.levels_resolved) if m.levels_resolved else None
+    m.m3 = (wins / (wins + losses)) if (wins + losses) else None
     m.m4 = statistics.fmean(offer_prices) if offer_prices else None
     m.b1 = (best_picks / picks) if picks else None
     return m
@@ -104,18 +105,26 @@ def session_metrics(conn, session_id: str) -> SessionMetrics:
 # The walker records blocked requests under a pseudo-session so they are
 # hash-chained; it is not gameplay and must not enter the analysis.
 NON_GAMEPLAY_PERSONAS = ("guard",)
+_ATTEMPT_SUFFIX = re.compile(r"-a\d+$")
 
 
 def run_metrics(conn, run_id: str) -> list[SessionMetrics]:
-    """One row per (persona, seed): its last attempt. Earlier attempts are attrition."""
     placeholders = ",".join("?" * len(NON_GAMEPLAY_PERSONAS))
-    ids = [r[0] for r in conn.execute(
-        f"SELECT session_id FROM sessions s WHERE run_id=? AND persona NOT IN ({placeholders})"
-        " AND COALESCE(attempts, 1) = (SELECT MAX(COALESCE(attempts, 1)) FROM sessions t"
-        "   WHERE t.run_id = s.run_id AND t.persona = s.persona AND t.seed = s.seed)"
-        " ORDER BY session_id",
+    # A retried session leaves its failed attempt in the store (it is attrition,
+    # and stays verifiable), but only the final attempt of each job
+    # (session id without its -aN suffix)
+    # enters the analysis.
+    rows = conn.execute(
+        f"SELECT session_id, persona, seed, COALESCE(attempts, 1) FROM sessions"
+        f" WHERE run_id=? AND persona NOT IN ({placeholders}) ORDER BY session_id",
         (run_id, *NON_GAMEPLAY_PERSONAS),
-    )]
+    ).fetchall()
+    final: dict[str, tuple[int, str]] = {}
+    for session_id, persona, seed, attempts in rows:
+        key = _ATTEMPT_SUFFIX.sub("", session_id)
+        if key not in final or attempts > final[key][0]:
+            final[key] = (attempts, session_id)
+    ids = sorted(sid for _, sid in final.values())
     return [session_metrics(conn, sid) for sid in ids]
 
 

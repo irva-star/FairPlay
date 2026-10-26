@@ -626,3 +626,31 @@ Compose publishes both ports on `127.0.0.1` only, so nothing is reachable from v
 Any host that runs a container behind HTTPS and supplies `$PORT` works (the choice is an open question in section 14). Deploy the game with `PLANTED_SWITCH` set and one instance only, since state is in memory. Deploy the dashboard from a commit whose `snapshot/` is current. After deploying, put the game's HTTPS origin into `HOSTED` in `walker/guard.py` (a code change, per S1).
 
 **CI** (`.github/workflows/ci.yml`): on every push, run `ruff check`, `ruff format --check`, `pytest -q`, build both images, and run the S12 image scan. No deploy step runs from CI: deploying stays a human action, consistent with S14.
+
+## 16. StreamVault: the subscription-trap audit **[Rev, new]**
+
+Door Run proves the method; StreamVault is the demo people feel. It is a fictional streaming service (`streamvault/`) with the dark patterns regulators have acted on: a drip-priced service fee (Cineplex, Federal Court of Appeal, January 2026), low-contrast auto-renewal fine print, and a cancellation maze (the FTC's Amazon Prime case, settled for $2.5 billion in September 2025). Every member meets those. On top, one **hidden judge rule** treats renters (members who rented a movie before signing up) worse.
+
+| `JUDGE_RULE` | Renters get | Metric that should move |
+|---|---|---|
+| `none` | Nothing different (specificity control) | none |
+| `fee` | Service fee +$3.00 | S1 |
+| `maze` | 4 more "Are you sure?" screens | S3 |
+| `preticked` | Two add-ons already ticked | S4 |
+
+The rule is read once at server start; no route reads or changes it, and the page state never contains it. `scripts/run_demo.py --batch sv-live --judge-rule secret` picks one at random without printing it. The plan does not contain it either, so a named approver approves the audit without knowing the answer.
+
+**Architecture.** The server owns every price and screen; the page (Gemini's design, adapted) is a thin client that posts one action to `POST /api/act` and renders the returned state, bumping `#app[data-seq]` after each entrance animation ends. The walker gained app adapters (`walker/apps/`): Door Run keeps its loop; `walker/apps/streamvault.py` supplies StreamVault's observation schema, ten-tool list, executor checks and loop. Budget, rate limiter, guard, evidence writer and CLI are shared. StreamVault runs on `127.0.0.1:8000`, so the guard is unchanged.
+
+**What the model sees.** Prices from `data-value` attributes (cents), checkbox states, the screen enum and the cancel step number. The guilt-trip messages and fine print never reach it (S2).
+
+**Personas.** `renter`, `member`, `member_twin` (A/A), identical except one sentence about renting first.
+
+**Metrics** (`stats/sv_metrics.py`, margins in `prereg_streamvault.yaml`): S1 fee, S2 checkout total minus advertised price, S3 clicks to finish cancelling, S4 add-ons pre-ticked, S5 Basic price (negative control), B1 chose Basic (balance). Holm over S1–S5. Contrasts `SV_audit` (renter − member) and `SV_aa` (member_twin − member) run on every StreamVault run.
+
+**Reveal.** `python -m validation.sv_reveal <run_id>` opens the oracle for that run's seeds only, prints the hidden rule, what the engine named, and whether each true effect lies inside its 95% CI.
+
+**Verified on Oct 25** with the zero-cost fake policy in real Chrome, 8 sessions per persona: all four rules named correctly, including `none`.
+
+**Zero variance.** When both groups score identically in every session (S5 always does), the difference is exact: equal values are reported as Equivalent, unequal ones are judged against the margin, and no p-value is invented.
+

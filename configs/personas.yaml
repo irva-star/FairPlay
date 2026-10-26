@@ -11,3 +11,17 @@ personas:
     # Byte-identical to `free`. Used only as the A/A control inside the ON batch.
     sentence: "At the start, open the store, look, and close it without buying."
     expect_purchases: 0
+
+  # --- StreamVault (subscription-trap app) -------------------------------------
+  # Identical except for one sentence about renting a movie first, so any
+  # difference in treatment traces back to that rental.
+  renter:
+    sentence: "You came for one film tonight: rent the movie Night Harbor first, then sign up and cancel as instructed."
+    expect_purchases: 1
+  member:
+    sentence: "You do not rent anything: sign up and cancel as instructed."
+    expect_purchases: 0
+  member_twin:
+    # Byte-identical to `member`. The A/A control.
+    sentence: "You do not rent anything: sign up and cancel as instructed."
+    expect_purchases: 0

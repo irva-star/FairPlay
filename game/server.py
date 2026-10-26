@@ -54,7 +54,9 @@ class Player:
     owned: set[str] = field(default_factory=set)
     last_result: str = R.RESULT_NONE
     offer_price: int | None = None
-    levels_resolved: int = 0
+    # True once the last level has been resolved. Kept separate from level_no so
+    # dismissing an offer from level 9 can never end the session early.
+    final_resolved: bool = False
     done: bool = False
 
     @property
@@ -86,6 +88,11 @@ class PickBody(BaseModel):
 async def rate_limit(request: Request, call_next):
     ip = request.client.host if request.client else "unknown"
     now = time.monotonic()
+    if ip in ("127.0.0.1", "::1"):
+        # Local audit batches: every agent shares the loopback address, so a
+        # per-IP limit would throttle the audit itself. The limit is for the
+        # hosted copy, where it sees each visitor's real address.
+        return await call_next(request)
     hits = _RATE[ip]
     while hits and now - hits[0] > RATE_WINDOW_SECONDS:
         hits.popleft()
@@ -133,9 +140,20 @@ def _shown_for_current_level(p: Player) -> list[int]:
     return R.shown_chances(base, penalty=penalty)
 
 
+# GAME_SKIN=rpg serves the same game as "Astral Vault": a different look over
+# the identical DOM contract, so agents and statistics are unchanged.
+GAME_SKIN = os.environ.get("GAME_SKIN", "").strip().lower()
+INDEX_FILE = "index_rpg.html" if GAME_SKIN == "rpg" else "index.html"
+
+
 @app.get("/")
 async def index(seed: int = 0) -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / INDEX_FILE)
+
+
+@app.get("/healthz")
+async def healthz() -> dict:
+    return {"ok": True}
 
 
 @app.post("/api/session/start")
@@ -209,11 +227,11 @@ async def level_pick(body: PickBody, pid: str | None = Cookie(default=None)) -> 
 
     p.last_result = R.RESULT_WIN if won else R.RESULT_LOSS
     p.offer_price = offer
-    p.levels_resolved = level
     if level >= R.LEVELS_TOTAL:
         # Stay on the last level; a pending offer must be dismissed before the
         # session can end, so the agent always gets to act on it.
         p.level_no = level
+        p.final_resolved = True
         p.done = offer is None
     else:
         p.level_no = level + 1
@@ -233,11 +251,9 @@ async def offer_dismiss(pid: str | None = Cookie(default=None)) -> dict:
     if p.offer_price is None:
         raise HTTPException(status_code=409, detail="no offer to dismiss")
     p.offer_price = None
-    # Done only once level 10 itself is resolved. level_no has already moved on
-    # to the next level, so after an offer on level 9 it reads 10 while level 10
-    # is still unplayed; checking it here ended those sessions a level early.
-    if p.levels_resolved >= R.LEVELS_TOTAL:
-        # The offer was the last thing standing between us and the end.
+    if p.final_resolved:
+        # Only an offer from the LAST level stands between us and the end. An
+        # offer from level 9 leaves level_no at 10 with level 10 still to play.
         p.done = True
     return {"done": p.done, "next_level": None if p.done else p.level_no}
 

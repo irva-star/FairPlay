@@ -49,12 +49,24 @@ METRIC_LABELS = {
     "M3": "Win rate over 10 levels",
     "M4": "Mean offer price (gems)",
     "B1": "Share of picks taking the best door",
+    # StreamVault
+    "S1": "Service fee at checkout (cents)",
+    "S2": "Checkout total minus advertised price (cents)",
+    "S3": "Clicks needed to finish cancelling",
+    "S4": "Add-ons pre-ticked on arrival",
+    "S5": "Basic plan price (negative control, cents)",
 }
+
+# Persona labels for StreamVault's headline panel.
+SV_PERSONA_LABELS = {"renter": "Rented a movie first", "member": "Did not rent",
+                     "member_twin": "Did not rent (A/A twin)"}
 
 CONTRAST_LABELS = {
     "V1_sensitivity": "V1 — spender vs free, rule ON (should detect)",
     "V2_specificity": "V2 — spender vs free, rule OFF (should find nothing)",
     "V3_aa": "V3 — free_twin vs free, A/A (should find nothing)",
+    "SV_audit": "StreamVault — renters vs members (does the hidden rule show?)",
+    "SV_aa": "StreamVault — member_twin vs member, A/A (should find nothing)",
 }
 
 
@@ -133,11 +145,11 @@ def parse_payload(raw: str | None) -> dict:
         return {}
 
 
-def prereg_hash() -> str:
+def prereg_hash(app: str = "doorrun") -> str:
     """Hash of the committed analysis plan, shown beside every result."""
     import hashlib
 
-    path = Path("prereg.yaml")
+    path = Path("prereg_streamvault.yaml" if app == "streamvault" else "prereg.yaml")
     if not path.exists():
         return "(prereg.yaml missing)"
     return hashlib.sha256(path.read_bytes()).hexdigest()[:16]

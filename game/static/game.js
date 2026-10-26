@@ -20,12 +20,19 @@ let levelsPlayed = 0;
 const $ = (id) => document.querySelector(`[data-testid="${id}"]`);
 
 async function api(path, body) {
-  const res = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: "same-origin",
-  });
+  let res;
+  /* Back off and retry when the hosted copy rate-limits us (HTTP 429), so a
+   * busy server never leaves "undefined" in the page for the walker to read. */
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    res = await fetch(path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: "same-origin",
+    });
+    if (res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+  }
   const text = await res.text();
   let data = {};
   if (text) { try { data = JSON.parse(text); } catch { data = {}; } }
