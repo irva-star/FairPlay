@@ -37,6 +37,20 @@ def test_the_apps_use_page_relative_paths() -> None:
         assert '"/static/' not in Path(page).read_text(encoding="utf-8"), page
 
 
+def test_each_app_page_loads_its_own_script(client: TestClient) -> None:
+    """A page whose script 404s renders as static, unclickable HTML."""
+    import re
+
+    for page in ("/doorrun/", "/streamvault/"):
+        html = client.get(page).text
+        copy = re.search(r'href="([a-z])/"', html)  # the chooser, when copies are configured
+        if copy:
+            page, html = f"{page}{copy.group(1)}/", client.get(f"{page}{copy.group(1)}/").text
+        for src in re.findall(r'<script src="([^"]+)"', html):
+            url = src if src.startswith("/") else page + src
+            assert client.get(url).status_code == 200, (page, src)
+
+
 def test_the_landing_page_carries_the_demo_banner(client: TestClient) -> None:
     for page in ("/", "/dashboard.html"):
         assert "TEST GAME, planted rule (demo)" in client.get(page).text

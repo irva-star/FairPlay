@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -257,8 +257,12 @@ def _register(copy: str) -> None:
     """Routes for one copy, under /<copy>/ (or the root for the unlabelled copy)."""
     prefix = f"/{copy}" if copy else ""
 
-    async def index() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html")
+    async def index(request: Request) -> HTMLResponse:
+        # The page sits at "/", "/a/" or under the hub ("/streamvault/a/"), so a
+        # relative script path can't be right everywhere; write the absolute one.
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        script = f"{request.scope.get('root_path', '')}/static/client.js"
+        return HTMLResponse(html.replace("{{CLIENT_JS}}", script))
 
     async def session_start(request: Request, response: Response, seed: int = 0) -> dict:
         _prune()
@@ -299,7 +303,6 @@ for _copy in COPIES:
     _register(_copy)
 
 if "" not in COPIES:
-    from fastapi.responses import HTMLResponse
 
     DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "#")
 
